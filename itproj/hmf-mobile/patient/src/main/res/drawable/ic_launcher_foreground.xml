@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pill capsule on teal: patient app icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:pivotX="54" android:pivotY="54" android:rotation="-45">
+        <path android:fillColor="#FFFFFF" android:pathData="M34,44h20v20h-20a10,10 0,0 1,0 -20z" />
+        <path android:fillColor="#9FD8D6" android:pathData="M54,44h20a10,10 0,0 1,0 20h-20z" />
+    </group>
+</vector>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme used by both apps -->
+    <style name="Theme.Hmf" parent="Theme.MaterialComponents.Light.DarkActionBar">
+        <item name="colorPrimary">@color/core_brand</item>
+        <item name="colorPrimaryVariant">@color/core_brand_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/core_brand</item>
+        <item name="colorSecondaryVariant">@color/core_brand_dark</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="android:statusBarColor">@color/core_brand_dark</item>
+        <item name="android:windowBackground">@color/core_bg</item>
+        <item name="android:textColorPrimary">@color/core_ink</item>
+        <item name="android:textColorSecondary">@color/core_muted</item>
+    </style>
+
+    <!-- Text styles -->
+    <style name="Hmf.Title" parent="TextAppearance.MaterialComponents.Headline6">
+        <item name="android:textColor">@color/core_ink</item>
+    </style>
+    <style name="Hmf.Body" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:textColor">@color/core_ink</item>
+    </style>
+    <style name="Hmf.Muted" parent="TextAppearance.MaterialComponents.Body2">
+        <item name="android:textColor">@color/core_muted</item>
+    </style>
+    <style name="Hmf.Label" parent="TextAppearance.MaterialComponents.Overline">
+        <item name="android:textColor">@color/core_muted</item>
+    </style>
+    <style name="Hmf.Badge" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:textStyle">bold</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
+    <!-- White rounded card -->
+    <style name="Hmf.Card" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">14dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/core_line</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardBackgroundColor">@color/white</item>
+        <item name="contentPadding">16dp</item>
+    </style>
+</resources>

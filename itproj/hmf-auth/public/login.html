@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in | Hospital Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-brand">
+      <div class="logo">Hospital Management</div>
+      <div class="tagline">
+        <h1>Welcome back</h1>
+        <p>Patients can book appointments and track prescriptions. Staff can manage care from one place.</p>
+      </div>
+      <small>Delivery drivers sign in through the driver mobile app.</small>
+    </aside>
+
+    <main class="auth-content">
+      <div class="card narrow">
+        <h2>Log in</h2>
+        <p class="sub">Use the email you registered with.</p>
+
+        <div id="alert" class="alert" role="alert"></div>
+
+        <form id="loginForm" novalidate>
+          <label>Email
+            <input type="email" name="email" autocomplete="email" required>
+          </label>
+          <label>Password
+            <input type="password" name="password" autocomplete="current-password" required>
+          </label>
+          <button class="btn block" type="submit">Log in</button>
+        </form>
+
+        <p class="switch">No account yet? <a href="register.html">Register</a></p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Opened by double-clicking the file: the page needs the server instead
+    if (location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', () => {
+        const a = document.getElementById('alert');
+        a.textContent = 'This page must be opened through the server. Run "npm start" in the hmf-auth folder, then go to http://localhost:3000';
+        a.className = 'alert error show';
+      });
+    }
+  </script>
+  <script src="/js/common.js"></script>
+  <script>
+    // Go straight to your portal if already logged in
+    fetch('/api/me').then(r => r.ok && r.json()).then(u => { if (u) location.href = u.home; });
+
+    // Show a message passed from the register page
+    const params = new URLSearchParams(location.search);
+    if (params.get('registered') === 'patient') showAlert('Registration successful. You can now log in.', 'success');
+    if (params.get('registered') === 'staff') showAlert('Registration received. An administrator must approve your account first.', 'success');
+
+    const form = document.getElementById('loginForm');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = formData(form);
+      if (!data.email || !data.password) return showAlert('Please enter your email and password.');
+
+      const btn = form.querySelector('button');
+      btn.disabled = true;
+      try {
+        const res = await postJSON('/api/login', data);
+        location.href = res.user.home;
+      } catch (err) {
+        showAlert(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

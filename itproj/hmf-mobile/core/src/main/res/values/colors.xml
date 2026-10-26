@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same colours as the web portal -->
+<resources>
+    <color name="core_brand">#0D6E6E</color>
+    <color name="core_brand_dark">#0B3F40</color>
+    <color name="core_brand_soft">#E3F1F0</color>
+    <color name="core_bg">#F3F6F8</color>
+    <color name="core_ink">#14232E</color>
+    <color name="core_muted">#5D6D79</color>
+    <color name="core_line">#DDE4EA</color>
+    <color name="core_ok">#116A3B</color>
+    <color name="core_warn">#8A5300</color>
+    <color name="core_warn_soft">#FFF4E0</color>
+    <color name="core_error">#B42318</color>
+    <color name="core_error_soft">#FDECEA</color>
+    <color name="core_info">#1D4F91</color>
+    <color name="white">#FFFFFF</color>
+</resources>

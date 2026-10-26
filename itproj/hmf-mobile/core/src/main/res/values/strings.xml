@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_hospital">Hospital Management</string>
+    <string name="core_email">Email</string>
+    <string name="core_password">Password</string>
+    <string name="core_login">Log in</string>
+    <string name="core_logout">Log out</string>
+    <string name="core_logout_question">Do you want to log out?</string>
+    <string name="core_logged_out">Your login has expired. Please log in again.</string>
+    <string name="core_enter_email_password">Enter your email and password.</string>
+    <string name="core_server_settings">Server settings</string>
+    <string name="core_server_address">Server address</string>
+    <string name="core_yes">Yes</string>
+    <string name="core_cancel">Cancel</string>
+    <string name="core_retry">Try again</string>
+    <string name="core_nothing_here">Nothing here yet.</string>
+    <string name="core_channel_deliveries">Delivery updates</string>
+    <string name="core_channel_deliveries_desc">Tells you when your medicine delivery changes</string>
+</resources>

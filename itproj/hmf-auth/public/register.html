@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register | Hospital Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-brand">
+      <div class="logo">Hospital Management</div>
+      <div class="tagline">
+        <h1>Create your account</h1>
+        <p>Patients get access right away. Staff accounts are checked by an administrator before first login.</p>
+      </div>
+      <small>Delivery drivers are registered by the hospital, not here.</small>
+    </aside>
+
+    <main class="auth-content">
+      <div class="card">
+        <h2>Register</h2>
+        <p class="sub">Choose the type of account you need.</p>
+
+        <div class="tabs full" role="tablist">
+          <button type="button" class="active" data-tab="patient" role="tab">Patient</button>
+          <button type="button" data-tab="staff" role="tab">Hospital staff</button>
+        </div>
+
+        <div id="alert" class="alert" role="alert"></div>
+
+        <!-- PATIENT FORM (matches the patients table) -->
+        <form id="patientForm" novalidate>
+          <fieldset>
+            <legend>Personal details</legend>
+            <div class="row">
+              <label>First name <input name="first_name" maxlength="80" required></label>
+              <label>Last name <input name="last_name" maxlength="80" required></label>
+            </div>
+            <div class="row">
+              <label>Date of birth <input type="date" name="date_of_birth" required></label>
+              <label>Gender
+                <select name="gender">
+                  <option value="unspecified">Prefer not to say</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
+            <div class="row">
+              <label>Email <input type="email" name="email" maxlength="150" autocomplete="email" required></label>
+              <label>Phone <span class="opt">(optional)</span> <input type="tel" name="phone" maxlength="20"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Address <span class="opt">(used for medicine delivery)</span></legend>
+            <label>Address line 1 <input name="address_line1" maxlength="150"></label>
+            <label>Address line 2 <span class="opt">(optional)</span> <input name="address_line2" maxlength="150"></label>
+            <div class="row">
+              <label>City <input name="city" maxlength="80"></label>
+              <label>Postal code <input name="postal_code" maxlength="20"></label>
+            </div>
+            <label>Country <input name="country" maxlength="80" value="South Africa"></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Emergency contact &amp; medical aid <span class="opt">(optional)</span></legend>
+            <div class="row">
+              <label>Contact name <input name="emergency_contact_name" maxlength="120"></label>
+              <label>Contact phone <input type="tel" name="emergency_contact_phone" maxlength="20"></label>
+            </div>
+            <div class="row">
+              <label>Medical aid provider <input name="insurance_provider" maxlength="120"></label>
+              <label>Policy number <input name="insurance_policy_no" maxlength="80"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Password</legend>
+            <div class="row">
+              <label>Password
+                <input type="password" name="password" autocomplete="new-password" required>
+                <div class="hint">At least 8 characters, with a letter and a number.</div>
+              </label>
+              <label>Confirm password <input type="password" name="confirm" autocomplete="new-password" required></label>
+            </div>
+          </fieldset>
+
+          <button class="btn block" type="submit">Create patient account</button>
+        </form>
+
+        <!-- STAFF FORM (matches the staff table) -->
+        <form id="staffForm" class="hidden" novalidate>
+          <fieldset>
+            <legend>Personal details</legend>
+            <div class="row">
+              <label>First name <input name="first_name" maxlength="80" required></label>
+              <label>Last name <input name="last_name" maxlength="80" required></label>
+            </div>
+            <div class="row">
+              <label>Work email <input type="email" name="email" maxlength="150" autocomplete="email" required></label>
+              <label>Phone <span class="opt">(optional)</span> <input type="tel" name="phone" maxlength="20"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Role</legend>
+            <div class="row">
+              <label>Role
+                <select name="role" id="roleSelect" required>
+                  <option value="">Select a role</option>
+                  <option value="doctor">Doctor</option>
+                  <option value="nurse">Nurse</option>
+                  <option value="pharmacist">Pharmacist</option>
+                  <option value="technician">Technician</option>
+                  <option value="receptionist">Receptionist</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label>Department
+                <select name="department_id" id="deptSelect">
+                  <option value="">None / not sure</option>
+                </select>
+              </label>
+            </div>
+            <div class="row">
+              <label>Specialisation <span class="opt">(optional)</span> <input name="specialization" maxlength="120"></label>
+              <label>License number <span class="opt" id="licenseOpt">(optional)</span>
+                <input name="license_number" id="licenseInput" maxlength="50">
+                <div class="hint">Required for doctors and pharmacists.</div>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Password</legend>
+            <div class="row">
+              <label>Password
+                <input type="password" name="password" autocomplete="new-password" required>
+                <div class="hint">At least 8 characters, with a letter and a number.</div>
+              </label>
+              <label>Confirm password <input type="password" name="confirm" autocomplete="new-password" required></label>
+            </div>
+          </fieldset>
+
+          <button class="btn block" type="submit">Request staff account</button>
+        </form>
+
+        <p class="switch">Already registered? <a href="login.html">Log in</a></p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Opened by double-clicking the file: the page needs the server instead
+    if (location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', () => {
+        const a = document.getElementById('alert');
+        a.textContent = 'This page must be opened through the server. Run "npm start" in the hmf-auth folder, then go to http://localhost:3000';
+        a.className = 'alert error show';
+      });
+    }
+  </script>
+  <script src="/js/common.js"></script>
+  <script src="/js/register.js"></script>
+</body>
+</html>

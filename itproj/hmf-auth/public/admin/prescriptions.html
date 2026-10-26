@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prescription checks | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="rx-checks" data-title="Prescription checks">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Prescription checks</h1><p>Validate prescriptions against the expiry date on record. Every hour, prescriptions past their expiry date are switched to expired: they are kept but can never be used again, so the doctor must issue a new one.</p></div>
+      <button class="btn secondary" id="runBtn" type="button">Run expiry check now</button>
+    </div>
+
+    <div class="grid-stats">
+      <div class="stat"><div class="label">Last expiry check</div><div class="value" id="sLast" style="font-size:1.2rem">–</div></div>
+      <div class="stat"><div class="label">Expired, waiting for a new one</div><div class="value" id="sDeleted">–</div></div>
+      <div class="stat attention"><div class="label">Expiring within 7 days</div><div class="value" id="sSoon">–</div></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:16px">
+      <section class="card">
+        <h2>Verify a prescription</h2>
+        <form id="verifyForm" novalidate>
+          <label>Prescription number <input name="prescription_id" class="mono" required></label>
+          <div class="row">
+            <label>Date of birth <span class="opt">(optional)</span><input type="date" name="date_of_birth"></label>
+            <label>Surname <span class="opt">(optional)</span><input name="last_name"></label>
+          </div>
+          <button class="btn" type="submit">Check prescription</button>
+        </form>
+        <div id="result" style="margin-top:16px"></div>
+      </section>
+
+      <section class="card flush">
+        <div class="card-head"><h2>Expiring soon</h2></div>
+        <div id="soonTable"></div>
+      </section>
+    </div>
+
+    <section class="card flush">
+      <div class="card-head"><h2>Expired prescriptions</h2></div>
+      <div id="deletedTable"></div>
+    </section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/validation.js"></script>
+  <script>
+    async function load() {
+      const [soon, log] = await Promise.all([api.get('/api/rx/expiring?days=7'), api.get('/api/rx/expired')]);
+      sSoon.textContent = soon.length;
+      sDeleted.textContent = log.expired.filter((r) => !r.renewed_by).length;
+      const last = log.runs[0];
+      sLast.textContent = last ? `${fmtDateTime(last.occurred_at)} · ${last.details.expired ?? 0} expired` : 'Not run yet';
+
+      renderTable('soonTable', [
+        { label: 'Patient', primary: true, render: (r) => `<span class="name">${esc(r.patient_name)}</span><span class="sub">Dr ${esc(r.doctor_name)}</span>` },
+        { label: 'Expires', render: (r) => `${esc(fmtDate(r.expiry_date))}<span class="sub">${r.days_left === 0 ? 'today' : `${r.days_left} day(s)`}</span>` },
+        { label: 'Status', render: (r) => badge(r.status) },
+        { label: '', render: (r) => `<div class="actions"><button class="btn sm secondary" data-check="${r.prescription_id}">Check</button></div>` }
+      ], soon, { empty: 'Nothing expires in the next 7 days.' });
+
+      renderTable('deletedTable', [
+        { label: 'Patient', primary: true, render: (r) => `<span class="name">${esc(r.patient_name)}</span><span class="sub">Dr ${esc(r.doctor_name)}</span>` },
+        { label: 'Issued', render: (r) => esc(fmtDate(r.issue_date)) },
+        { label: 'Expiry date', render: (r) => esc(fmtDate(r.expiry_date)) },
+        { label: 'Medicines', render: (r) => r.items },
+        { label: 'New prescription', render: (r) => r.renewed_by ? badge('active', 'Issued') : badge('pending', 'Not yet') },
+        { label: '', render: (r) => `<div class="actions"><button class="btn sm secondary" data-check="${r.prescription_id}">Check</button></div>` }
+      ], log.expired, { empty: 'No prescriptions have expired yet.' });
+    }
+
+    const checkFromList = (e) => {
+      const b = e.target.closest('[data-check]');
+      if (!b) return;
+      verifyForm.prescription_id.value = b.dataset.check;
+      verifyForm.requestSubmit();
+      verifyForm.scrollIntoView({ behavior: 'smooth' });
+    };
+    soonTable.addEventListener('click', checkFromList);
+    deletedTable.addEventListener('click', checkFromList);
+
+    runBtn.addEventListener('click', async () => {
+      try {
+        const r = await busy(runBtn, () => api.post('/api/rx/expire-now'));
+        toast(`Expiry check done: ${r.expired} marked expired, ${r.cancelled_deliveries} delivery(ies) cancelled`);
+        load();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    App.ready.then(() => { wireVerifyForm(verifyForm, result); load(); });
+  </script>
+</body>
+</html>

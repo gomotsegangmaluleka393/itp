@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="staff" data-title="Staff">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Staff</h1><p>Approve new registrations and manage staff access.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs" id="statusTabs">
+        <button data-status="all" class="active">All</button>
+        <button data-status="pending">Pending</button>
+        <button data-status="active">Active</button>
+        <button data-status="inactive">Inactive</button>
+      </div>
+      <input class="search" type="search" id="search" placeholder="Search name, email or license">
+    </div>
+
+    <section class="card flush"><div id="staffTable"></div></section>
+  </main>
+
+  <!-- Edit staff member -->
+  <dialog class="modal" id="editModal">
+    <form id="editForm" novalidate>
+      <div class="modal-head"><h2 id="editTitle">Edit staff</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+      <div class="modal-body">
+        <div id="editAlert" class="alert" role="alert"></div>
+        <div class="row">
+          <label>Role
+            <select name="role">
+              <option value="doctor">Doctor</option><option value="nurse">Nurse</option>
+              <option value="pharmacist">Pharmacist</option><option value="technician">Technician</option>
+              <option value="receptionist">Receptionist</option><option value="admin">Admin</option>
+            </select>
+          </label>
+          <label>Department <select name="department_id" id="deptSelect"><option value="">None</option></select></label>
+        </div>
+        <label>License number <span class="opt">(required for doctors and pharmacists)</span><input name="license_number" maxlength="50"></label>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Save</button></div>
+    </form>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    let tab = new URLSearchParams(location.search).get('status') || 'all';
+    let rows = [];
+    let editing = null;
+    let myId = null;
+
+    const statusBadge = (s) => s.account_status === 'pending' ? badge('pending', 'Pending approval') : badge(s.account_status);
+
+    async function load() {
+      rows = await api.get(`/api/admin/staff?status=${tab}&q=${encodeURIComponent(search.value)}`);
+      renderTable('staffTable', [
+        { label: 'Name', primary: true, render: (s) => `<span class="name">${esc(s.first_name)} ${esc(s.last_name)}</span><span class="sub">${esc(s.email)}</span>` },
+        { label: 'Role', render: (s) => esc(label(s.role)) + (s.specialization ? `<span class="sub">${esc(s.specialization)}</span>` : '') },
+        { label: 'Department', render: (s) => esc(s.department || '—') },
+        { label: 'License', render: (s) => esc(s.license_number || '—') },
+        { label: 'Last login', render: (s) => esc(s.last_login_at ? fmtDateTime(s.last_login_at) : 'Never') },
+        { label: 'Status', render: statusBadge },
+        { label: '', render: (s) => `<div class="actions">
+            ${s.account_status === 'pending' ? `<button class="btn sm" data-act="approve" data-id="${s.staff_id}">Approve</button>` : ''}
+            ${s.account_status === 'inactive' ? `<button class="btn sm secondary" data-act="activate" data-id="${s.staff_id}">Reactivate</button>` : ''}
+            ${s.account_status === 'active' && s.staff_id !== myId ? `<button class="btn sm danger" data-act="deactivate" data-id="${s.staff_id}">Deactivate</button>` : ''}
+            <button class="btn sm secondary" data-act="edit" data-id="${s.staff_id}">Edit</button></div>` }
+      ], rows, { empty: 'No staff found.' });
+    }
+
+    // Tabs
+    statusTabs.querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.status === tab);
+      b.addEventListener('click', () => {
+        tab = b.dataset.status;
+        statusTabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+        history.replaceState(null, '', `?status=${tab}`);
+        load();
+      });
+    });
+    search.addEventListener('input', debounce(load));
+
+    // Row buttons
+    staffTable.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      const s = rows.find((r) => r.staff_id === btn.dataset.id);
+
+      if (btn.dataset.act === 'edit') {
+        editing = s;
+        editTitle.textContent = `Edit ${s.first_name} ${s.last_name}`;
+        editForm.role.value = s.role;
+        editForm.department_id.value = s.department_id || '';
+        editForm.license_number.value = s.license_number || '';
+        hideAlert('editAlert');
+        return openModal('editModal');
+      }
+
+      if (btn.dataset.act === 'deactivate' && !confirm(`Deactivate ${s.first_name} ${s.last_name}? They will be logged out and unable to sign in.`)) return;
+      try {
+        await busy(btn, () => api.patch(`/api/admin/staff/${s.staff_id}`, { is_active: btn.dataset.act !== 'deactivate' }));
+        toast(btn.dataset.act === 'deactivate' ? 'Account deactivated' : 'Account activated');
+        load();
+        App.refreshCounts();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    editForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = formData(editForm);
+      try {
+        await busy(e.submitter, () => api.patch(`/api/admin/staff/${editing.staff_id}`, d));
+        closeModal('editModal');
+        toast('Saved');
+        load();
+      } catch (err) { showAlert(err.message, 'error', 'editAlert'); }
+    });
+
+    App.ready.then(async (u) => {
+      myId = u.staff_id;
+      const depts = await api.get('/api/departments');
+      depts.forEach((d) => deptSelect.add(new Option(d.name, d.department_id)));
+      load();
+    });
+  </script>
+</body>
+</html>

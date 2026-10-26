@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointments | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="appointments" data-title="Appointments">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Appointments</h1><p>All appointments across the hospital.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="date" id="dateFilter" aria-label="Date">
+      <select id="statusFilter" aria-label="Status">
+        <option value="">All statuses</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="checked_in">Checked in</option>
+        <option value="in_progress">In progress</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="no_show">No show</option>
+      </select>
+      <button class="btn secondary" id="allDates" type="button">Show all dates</button>
+    </div>
+
+    <section class="card flush"><div id="apptTable"></div></section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    dateFilter.value = todayISO();
+
+    async function load() {
+      const qs = new URLSearchParams({ date: dateFilter.value, status: statusFilter.value });
+      const rows = await api.get(`/api/admin/appointments?${qs}`);
+      renderTable('apptTable', [
+        { label: 'Time', primary: true, render: (a) => `<span class="name">${esc(fmtDateTime(a.scheduled_start))}</span><span class="sub">until ${esc(fmtTime(a.scheduled_end))}</span>` },
+        { label: 'Patient', render: (a) => esc(a.patient_name) },
+        { label: 'Doctor', render: (a) => esc(a.doctor_name) },
+        { label: 'Department', render: (a) => esc(a.department || '—') },
+        { label: 'Reason', render: (a) => esc(a.reason || '—') },
+        { label: 'Room', render: (a) => esc(a.room_number || '—') },
+        { label: 'Status', render: (a) => badge(a.status) }
+      ], rows, { empty: 'No appointments match these filters.' });
+    }
+
+    dateFilter.addEventListener('change', load);
+    statusFilter.addEventListener('change', load);
+    allDates.addEventListener('click', () => { dateFilter.value = ''; load(); });
+    App.ready.then(load);
+  </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Server address: the live server on Render.
+         If your Render address is different, change it here.
+         To test against your own computer instead, tap "Server settings" on the login screen
+         and enter http://10.0.2.2:3000 (emulator) or http://192.168.x.x:3000 (real phone, debug builds only). -->
+    <string name="core_default_server" translatable="false">https://hmf.onrender.com</string>
+</resources>

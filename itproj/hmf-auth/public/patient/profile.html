@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My profile | Patient portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="patient" data-page="profile" data-title="My profile">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>My profile</h1><p>Keep your contact and delivery details up to date.</p></div>
+    </div>
+
+    <form id="profileForm" class="card" style="max-width:860px" novalidate>
+      <div id="alert" class="alert" role="alert"></div>
+
+      <fieldset>
+        <legend>Personal details</legend>
+        <p class="small muted">To change your name or date of birth, please ask reception.</p>
+        <div class="row">
+          <label>Name <input id="fullName" readonly></label>
+          <label>Date of birth <input id="dob" readonly></label>
+        </div>
+        <div class="row">
+          <label>Email <input id="email" readonly></label>
+          <label>Phone <input type="tel" name="phone" maxlength="20"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Delivery address</legend>
+        <label>Address line 1 <input name="address_line1" maxlength="150"></label>
+        <label>Address line 2 <span class="opt">(optional)</span><input name="address_line2" maxlength="150"></label>
+        <div class="row-3">
+          <label>City <input name="city" maxlength="80"></label>
+          <label>Postal code <input name="postal_code" maxlength="20"></label>
+          <label>Country <input name="country" maxlength="80"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Emergency contact &amp; medical aid</legend>
+        <div class="row">
+          <label>Contact name <input name="emergency_contact_name" maxlength="120"></label>
+          <label>Contact phone <input type="tel" name="emergency_contact_phone" maxlength="20"></label>
+        </div>
+        <div class="row">
+          <label>Medical aid provider <input name="insurance_provider" maxlength="120"></label>
+          <label>Policy number <input name="insurance_policy_no" maxlength="80"></label>
+        </div>
+      </fieldset>
+
+      <button class="btn" type="submit">Save changes</button>
+    </form>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    async function load() {
+      const p = await api.get('/api/patient/profile');
+      fullName.value = `${p.first_name} ${p.last_name}`;
+      dob.value = fmtDate(p.date_of_birth);
+      email.value = p.email || '';
+      for (const el of profileForm.elements) {
+        if (el.name && el.name in p) el.value = p[el.name] || '';
+      }
+    }
+
+    profileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await busy(e.submitter, () => api.put('/api/patient/profile', formData(profileForm)));
+        hideAlert();
+        toast('Profile saved');
+      } catch (err) { showAlert(err.message); }
+    });
+
+    App.ready.then(() => load().catch((e) => toast(e.message, 'error')));
+  </script>
+</body>
+</html>

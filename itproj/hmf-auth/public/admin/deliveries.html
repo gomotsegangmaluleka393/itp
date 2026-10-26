@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deliveries | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="deliveries" data-title="Deliveries">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Deliveries</h1><p>Assign drivers to delivery requests. The prescription is validated again before a driver is assigned.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <button data-s="open" class="active">Open</button>
+        <button data-s="pending">Needs driver</button>
+        <button data-s="out_for_delivery">On the road</button>
+        <button data-s="delivered">Delivered</button>
+        <button data-s="failed">Failed</button>
+        <button data-s="">All</button>
+      </div>
+    </div>
+    <section class="card flush"><div id="table"></div></section>
+  </main>
+
+  <!-- Assign a driver -->
+  <dialog class="modal" id="assignModal">
+    <form id="assignForm" novalidate>
+      <div class="modal-head"><h2 id="aTitle">Assign driver</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+      <div class="modal-body">
+        <div id="aAlert" class="alert" role="alert"></div>
+        <div class="row">
+          <label>Driver <select name="driver_id" id="driverSelect" required><option value="">Choose a driver</option></select></label>
+          <label>Vehicle <select name="vehicle_id" id="vehicleSelect"><option value="">No vehicle</option></select></label>
+        </div>
+        <div class="row-3">
+          <label>Date <input type="date" name="scheduled_date"></label>
+          <label>From <input type="time" name="scheduled_window_start"></label>
+          <label>To <input type="time" name="scheduled_window_end"></label>
+        </div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Assign</button></div>
+    </form>
+  </dialog>
+
+  <!-- Signature -->
+  <dialog class="modal" id="proofModal">
+    <div class="modal-head"><h2>Proof of delivery</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="modal-body"><div id="proofInfo"></div><img id="proofImg" alt="Signature of the person who received the delivery" style="width:100%;border:1px solid var(--line);border-radius:8px;background:#fff"></div>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    let tab = 'open';
+    let rows = [];
+    let current = null;
+
+    async function load() {
+      rows = await api.get(`/api/admin/deliveries?status=${tab}`);
+      renderTable('table', [
+        { label: 'Patient', primary: true, render: (d) => `<span class="name">${esc(d.patient_name)}</span><span class="sub">${esc(d.address_line1)}, ${esc(d.city)}</span>` },
+        { label: 'Requested', render: (d) => esc(fmtDateTime(d.created_at)) },
+        { label: 'Date', render: (d) => esc(d.scheduled_date ? fmtDay(d.scheduled_date) : 'Not set') },
+        { label: 'Driver', render: (d) => d.driver_name ? `${esc(d.driver_name)}${d.plate_number ? `<span class="sub">${esc(d.plate_number)}</span>` : ''}` : '<span class="muted">Not assigned</span>' },
+        { label: 'Status', render: (d) => badge(d.status) + (d.failure_reason ? `<span class="sub">${esc(d.failure_reason)}</span>` : '')
+            + (d.status === 'out_for_delivery' && d.driver_location_at ? `<span class="sub">GPS ${esc(fmtTime(d.driver_location_at))}</span>` : '') },
+        { label: '', render: (d) => `<div class="actions">
+            ${['pending', 'assigned'].includes(d.status) ? `<button class="btn sm" data-act="assign" data-id="${d.delivery_id}">${d.driver_id ? 'Change' : 'Assign'}</button>` : ''}
+            ${['pending', 'assigned', 'out_for_delivery'].includes(d.status) ? `<button class="btn sm danger" data-act="cancel" data-id="${d.delivery_id}">Cancel</button>` : ''}
+            ${d.has_signature ? `<button class="btn sm secondary" data-act="proof" data-id="${d.delivery_id}">Signature</button>` : ''}</div>` }
+      ], rows, { empty: 'No deliveries here.' });
+    }
+
+    tabs.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      tab = b.dataset.s;
+      tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+      load();
+    }));
+
+    table.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      current = rows.find((r) => r.delivery_id === b.dataset.id);
+
+      if (b.dataset.act === 'assign') {
+        aTitle.textContent = `Assign driver – ${current.patient_name}`;
+        assignForm.reset();
+        assignForm.driver_id.value = current.driver_id || '';
+        assignForm.vehicle_id.value = current.vehicle_id || '';
+        assignForm.scheduled_date.value = current.scheduled_date || todayISO();
+        hideAlert('aAlert');
+        return openModal('assignModal');
+      }
+      if (b.dataset.act === 'proof') {
+        proofInfo.innerHTML = `<p>Received by <b>${esc(current.recipient_name || '—')}</b> on ${esc(fmtDateTime(current.delivered_at))}</p>`;
+        proofImg.src = `/api/admin/deliveries/${current.delivery_id}/proof`;
+        return openModal('proofModal');
+      }
+      if (b.dataset.act === 'cancel') {
+        const reason = prompt('Reason for cancelling?', 'Cancelled by hospital');
+        if (reason === null) return;
+        try {
+          await busy(b, () => api.patch(`/api/admin/deliveries/${current.delivery_id}/cancel`, { reason }));
+          toast('Delivery cancelled');
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+    });
+
+    assignForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = formData(assignForm);
+      if (!d.driver_id) return showAlert('Choose a driver.', 'error', 'aAlert');
+      try {
+        await busy(e.submitter, () => api.patch(`/api/admin/deliveries/${current.delivery_id}/assign`, d));
+        closeModal('assignModal');
+        toast('Driver assigned');
+        load();
+        App.refreshCounts();
+      } catch (err) { showAlert(err.message, 'error', 'aAlert'); }
+    });
+
+    App.ready.then(async () => {
+      const [drivers, vehicles] = await Promise.all([api.get('/api/admin/drivers'), api.get('/api/admin/vehicles')]);
+      drivers.filter((d) => d.status === 'active').forEach((d) => driverSelect.add(new Option(`${d.first_name} ${d.last_name} (${d.active_deliveries} active)`, d.driver_id)));
+      vehicles.filter((v) => v.is_active).forEach((v) => vehicleSelect.add(new Option(`${v.plate_number}${v.make_model ? ` – ${v.make_model}` : ''}`, v.vehicle_id)));
+      load();
+    });
+  </script>
+</body>
+</html>

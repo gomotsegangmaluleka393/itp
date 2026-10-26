@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drivers & vehicles | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="drivers" data-title="Drivers & vehicles">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Drivers &amp; vehicles</h1><p>Drivers sign in to the driver app with the email and password you set here.</p></div>
+      <button class="btn" id="addBtn" type="button">+ Add driver</button>
+    </div>
+
+    <section class="card flush" style="margin-bottom:20px">
+      <div class="card-head"><h2>Drivers</h2></div>
+      <div id="driverTable"></div>
+    </section>
+
+    <div class="grid-main">
+      <section class="card flush"><div class="card-head"><h2>Vehicles</h2></div><div id="vehicleTable"></div></section>
+      <section class="card">
+        <h2>Add vehicle</h2>
+        <div id="vAlert" class="alert" role="alert"></div>
+        <form id="vehicleForm" novalidate>
+          <label>Number plate <input name="plate_number" maxlength="20" required></label>
+          <label>Make and model <span class="opt">(optional)</span><input name="make_model" maxlength="100"></label>
+          <label>Type <select name="vehicle_type"><option value="motorbike">Motorbike</option><option value="car">Car</option><option value="van">Van</option></select></label>
+          <button class="btn block" type="submit">Add vehicle</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <dialog class="modal" id="driverModal">
+    <form id="driverForm" novalidate>
+      <div class="modal-head"><h2>Add driver</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+      <div class="modal-body">
+        <div id="dAlert" class="alert" role="alert"></div>
+        <div class="row">
+          <label>First name <input name="first_name" maxlength="80" required></label>
+          <label>Last name <input name="last_name" maxlength="80" required></label>
+        </div>
+        <div class="row">
+          <label>Phone <input type="tel" name="phone" maxlength="20" required></label>
+          <label>Driver's license number <input name="driver_license_number" maxlength="50" required></label>
+        </div>
+        <label>Employment <select name="employment_type"><option value="employee">Employee</option><option value="contractor">Contractor</option></select></label>
+        <fieldset>
+          <legend>App login</legend>
+          <div class="row">
+            <label>Email <input type="email" name="email" maxlength="150" required></label>
+            <label>Password <input type="password" name="password" autocomplete="new-password" required>
+              <div class="hint">8+ characters with a letter and a number. Give it to the driver privately.</div></label>
+          </div>
+        </fieldset>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Add driver</button></div>
+    </form>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    const STATUSES = ['active', 'on_leave', 'suspended', 'inactive'];
+
+    async function loadDrivers() {
+      const rows = await api.get('/api/admin/drivers');
+      renderTable('driverTable', [
+        { label: 'Driver', primary: true, render: (d) => `<span class="name">${esc(d.first_name)} ${esc(d.last_name)}</span><span class="sub">${esc(d.login_email || d.email || '')}</span>` },
+        { label: 'Phone', render: (d) => esc(d.phone) },
+        { label: 'License', render: (d) => esc(d.driver_license_number) },
+        { label: 'Type', render: (d) => esc(d.employment_type) },
+        { label: 'Deliveries', render: (d) => `${d.active_deliveries} active<span class="sub">${d.delivered} delivered · ${d.failed} failed</span>` },
+        { label: 'Last app login', render: (d) => esc(d.last_login_at ? fmtDateTime(d.last_login_at) : 'Never') },
+        { label: 'Status', render: (d) => `<select data-driver="${d.driver_id}" aria-label="Status" style="margin:0;min-width:130px">
+            ${STATUSES.map((s) => `<option value="${s}" ${s === d.status ? 'selected' : ''}>${label(s)}</option>`).join('')}</select>` }
+      ], rows, { empty: 'No drivers yet. Add one to start assigning deliveries.' });
+    }
+
+    async function loadVehicles() {
+      const rows = await api.get('/api/admin/vehicles');
+      renderTable('vehicleTable', [
+        { label: 'Plate', primary: true, render: (v) => `<span class="name">${esc(v.plate_number)}</span>` },
+        { label: 'Vehicle', render: (v) => esc(v.make_model || '—') + (v.vehicle_type ? `<span class="sub">${esc(v.vehicle_type)}</span>` : '') },
+        { label: 'Status', render: (v) => v.is_active ? badge('active') : badge('inactive') },
+        { label: '', render: (v) => `<div class="actions"><button class="btn sm secondary" data-vehicle="${v.vehicle_id}" data-on="${!v.is_active}">${v.is_active ? 'Retire' : 'Bring back'}</button></div>` }
+      ], rows, { empty: 'No vehicles yet.' });
+    }
+
+    driverTable.addEventListener('change', async (e) => {
+      const sel = e.target.closest('[data-driver]');
+      if (!sel) return;
+      if (sel.value !== 'active' && !confirm('The driver will be logged out of the app. Continue?')) { loadDrivers(); return; }
+      try {
+        await api.patch(`/api/admin/drivers/${sel.dataset.driver}`, { status: sel.value });
+        toast('Driver status saved');
+      } catch (err) { toast(err.message, 'error'); loadDrivers(); }
+    });
+
+    vehicleTable.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-vehicle]');
+      if (!b) return;
+      await busy(b, () => api.patch(`/api/admin/vehicles/${b.dataset.vehicle}`, { is_active: b.dataset.on === 'true' }));
+      loadVehicles();
+    });
+
+    addBtn.addEventListener('click', () => { driverForm.reset(); hideAlert('dAlert'); openModal('driverModal'); });
+
+    driverForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = formData(driverForm);
+      if (!passwordOk(d.password || '')) return showAlert('Password must be 8+ characters with a letter and a number.', 'error', 'dAlert');
+      try {
+        await busy(e.submitter, () => api.post('/api/admin/drivers', d));
+        closeModal('driverModal');
+        toast('Driver added');
+        loadDrivers();
+      } catch (err) { showAlert(err.message, 'error', 'dAlert'); }
+    });
+
+    vehicleForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await busy(e.submitter, () => api.post('/api/admin/vehicles', formData(vehicleForm)));
+        vehicleForm.reset();
+        hideAlert('vAlert');
+        toast('Vehicle added');
+        loadVehicles();
+      } catch (err) { showAlert(err.message, 'error', 'vAlert'); }
+    });
+
+    App.ready.then(() => Promise.all([loadDrivers(), loadVehicles()]));
+  </script>
+</body>
+</html>

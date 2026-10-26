@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Truck on teal: driver app icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="30" android:translateY="30">
+        <path android:fillColor="#FFFFFF"
+            android:pathData="M2,10h28v22h-3a6,6 0,0 0,-11 0H2zM32,16h8l8,9v7h-3a6,6 0,0 0,-11 0h-2zM10.5,30a5,5 0,1 1,0 10a5,5 0,0 1,0 -10zM39.5,30a5,5 0,1 1,0 10a5,5 0,0 1,0 -10z" />
+    </group>
+</vector>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify prescription | Hospital Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<!-- Shared page: pharmacists and doctors check a prescription before dispensing -->
+<body class="loading" data-portal="auto" data-page="verify" data-title="Verify prescription">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Verify prescription</h1><p>Check a prescription before medicine is dispensed.</p></div>
+    </div>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2>Prescription details</h2>
+        <form id="verifyForm" novalidate>
+          <label>Prescription number <input name="prescription_id" class="mono" placeholder="e.g. 0902dd9a-63d7-4d93-9324-fa5962ca263c" required></label>
+          <p class="small muted">Confirm who is collecting (recommended):</p>
+          <div class="row">
+            <label>Patient date of birth <input type="date" name="date_of_birth"></label>
+            <label>Patient surname <input name="last_name"></label>
+          </div>
+          <button class="btn" type="submit">Check prescription</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>What is checked</h2>
+        <ul class="small" style="margin:0;padding-left:18px;line-height:1.9">
+          <li>The doctor is active, registered as a doctor and has a license number</li>
+          <li>The patient exists and their identity matches</li>
+          <li>The prescription is active and not past its expiry date</li>
+          <li>Doses are within safe single and daily limits</li>
+          <li>No clash with the patient's recorded allergies</li>
+          <li>No duplicate or interacting medicines on other active prescriptions</li>
+          <li>Controlled medicines: no refills, 30-day validity, ID check</li>
+        </ul>
+      </section>
+    </div>
+    <div id="result" style="margin-top:16px"></div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/validation.js"></script>
+  <script>
+    App.ready.then(() => {
+      wireVerifyForm(verifyForm, result);
+      const id = new URLSearchParams(location.search).get('id');
+      if (id) { verifyForm.prescription_id.value = id; verifyForm.requestSubmit(); }
+    });
+  </script>
+</body>
+</html>

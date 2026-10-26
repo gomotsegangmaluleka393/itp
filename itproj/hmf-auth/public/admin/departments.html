@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Departments | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="departments" data-title="Departments">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Departments</h1><p>Departments staff can be assigned to.</p></div>
+    </div>
+
+    <div class="grid-main">
+      <section class="card flush"><div id="deptTable"></div></section>
+
+      <section class="card">
+        <h2>Add department</h2>
+        <div id="alert" class="alert" role="alert"></div>
+        <form id="deptForm" novalidate>
+          <label>Name <input name="name" maxlength="100" required></label>
+          <label>Location <span class="opt">(optional)</span><input name="location" maxlength="150" placeholder="e.g. Block B, Level 2"></label>
+          <label>Phone <span class="opt">(optional)</span><input name="phone" type="tel" maxlength="20"></label>
+          <button class="btn block" type="submit">Add department</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    let rows = [];
+
+    async function load() {
+      rows = await api.get('/api/admin/departments');
+      renderTable('deptTable', [
+        { label: 'Department', primary: true, render: (d) => `<span class="name">${esc(d.name)}</span>` },
+        { label: 'Location', render: (d) => esc(d.location || '—') },
+        { label: 'Phone', render: (d) => esc(d.phone || '—') },
+        { label: 'Active staff', render: (d) => d.staff_count },
+        { label: '', render: (d) => `<div class="actions"><button class="btn sm danger" data-del="${d.department_id}">Delete</button></div>` }
+      ], rows, { empty: 'No departments yet. Add one to get started.' });
+    }
+
+    deptForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = formData(deptForm);
+      if (!d.name) return showAlert('Please enter a department name.');
+      try {
+        await busy(e.submitter, () => api.post('/api/admin/departments', d));
+        deptForm.reset();
+        hideAlert();
+        toast('Department added');
+        load();
+      } catch (err) { showAlert(err.message); }
+    });
+
+    deptTable.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-del]');
+      if (!btn) return;
+      const d = rows.find((r) => String(r.department_id) === btn.dataset.del);
+      const warn = d.staff_count ? ` ${d.staff_count} staff member(s) will be left without a department.` : '';
+      if (!confirm(`Delete ${d.name}?${warn}`)) return;
+      try {
+        await busy(btn, () => api.del(`/api/admin/departments/${d.department_id}`));
+        toast('Department deleted');
+        load();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    App.ready.then(load);
+  </script>
+</body>
+</html>

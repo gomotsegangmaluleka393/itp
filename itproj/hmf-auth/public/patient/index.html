@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home | Patient portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="patient" data-page="dashboard" data-title="Home">
+  <main class="page">
+    <div class="page-head">
+      <div><h1 id="greeting">Welcome</h1><p>Your appointments, medicine and deliveries in one place.</p></div>
+      <div class="actions">
+        <button class="btn secondary" type="button" id="askBtn">Ask the health assistant</button>
+        <a class="btn" href="/patient/appointments.html?book=1">+ Book appointment</a>
+      </div>
+    </div>
+
+    <div id="expiringNote" class="alert warn hidden"></div>
+
+    <div class="grid-stats">
+      <a class="stat" href="/patient/appointments.html"><div class="label">Upcoming appointments</div><div class="value" id="sAppts">–</div></a>
+      <a class="stat" href="/patient/prescriptions.html"><div class="label">Active prescriptions</div><div class="value" id="sRx">–</div></a>
+      <a class="stat" href="/patient/deliveries.html"><div class="label">Deliveries on the way</div><div class="value" id="sDel">–</div></a>
+    </div>
+
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-head"><h2>Next appointment</h2></div>
+        <div id="nextAppt"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Current medicine</h2><a class="small" href="/patient/prescriptions.html">All prescriptions</a></div>
+        <div id="meds"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    async function load() {
+      const [s, rx] = await Promise.all([api.get('/api/patient/summary'), api.get('/api/patient/prescriptions')]);
+      sAppts.textContent = s.upcoming;
+      sRx.textContent = s.rx_active;
+      sDel.textContent = s.deliveries_open;
+
+      if (s.rx_expiring) {
+        expiringNote.textContent = `${s.rx_expiring} of your prescriptions expire within 7 days. Book a follow-up if you still need the medicine.`;
+        expiringNote.classList.remove('hidden');
+      }
+
+      const a = s.next;
+      nextAppt.innerHTML = a ? `
+        <dl class="details">
+          <dt>When</dt><dd>${esc(fmtDay(a.scheduled_start))} at ${esc(fmtTime(a.scheduled_start))}</dd>
+          <dt>Doctor</dt><dd>Dr ${esc(a.doctor_name)}</dd>
+          <dt>Department</dt><dd>${esc(a.department || '—')}</dd>
+          <dt>Where</dt><dd>${esc([a.location, a.room_number && `Room ${a.room_number}`].filter(Boolean).join(', ') || 'Reception will direct you')}</dd>
+          <dt>Status</dt><dd>${badge(a.status)}</dd>
+        </dl>`
+        : `<div class="empty">No upcoming appointments.<br><a href="/patient/appointments.html?book=1">Book one now</a></div>`;
+
+      const active = rx.filter((r) => r.status === 'active');
+      meds.innerHTML = active.length ? active.flatMap((r) => r.items.map((i) => `
+        <div class="med">
+          <b>${esc(i.medication)}</b>
+          <div class="small">${esc(i.dosage)}, ${esc(i.frequency)}${i.instructions ? ` · ${esc(i.instructions)}` : ''}</div>
+          <div class="small muted">Valid until ${esc(fmtDate(r.expiry_date))}</div>
+        </div>`)).join('') : '<div class="empty">No active prescriptions.</div>';
+    }
+
+    askBtn.addEventListener('click', () => window.HealthAssistant && window.HealthAssistant.open());
+
+    App.ready.then((u) => {
+      greeting.textContent = `Hello, ${u.name.split(' ')[0]}`;
+      load().catch((e) => toast(e.message, 'error'));
+    });
+  </script>
+</body>
+</html>

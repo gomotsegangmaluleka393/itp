@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Doctor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="doctor" data-page="dashboard" data-title="Dashboard">
+  <main class="page">
+    <div class="page-head">
+      <div><h1 id="greeting">Dashboard</h1><p id="today"></p></div>
+      <a class="btn" href="/doctor/prescriptions.html?new=1">+ New prescription</a>
+    </div>
+
+    <div class="grid-stats">
+      <div class="stat"><div class="label">Appointments today</div><div class="value" id="sToday">–</div></div>
+      <div class="stat"><div class="label">Still to see</div><div class="value" id="sRemaining">–</div></div>
+      <div class="stat"><div class="label">Seen today</div><div class="value" id="sDone">–</div></div>
+      <a class="stat" href="/doctor/appointments.html?view=upcoming"><div class="label">Next 7 days</div><div class="value" id="sWeek">–</div></a>
+      <a class="stat" href="/doctor/prescriptions.html"><div class="label">Active prescriptions</div><div class="value" id="sRx">–</div></a>
+    </div>
+
+    <div class="grid-main">
+      <section class="card">
+        <div class="card-head"><h2>Today's schedule</h2><a class="small" href="/doctor/appointments.html">Full schedule</a></div>
+        <ul class="list" id="todayList"></ul>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Coming up</h2></div>
+        <ul class="list" id="upcomingList"></ul>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/doctor.js"></script>
+  <script>
+    today.textContent = new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    async function load() {
+      const [s, todays, upcoming] = await Promise.all([
+        api.get('/api/doctor/stats'),
+        api.get('/api/doctor/appointments?view=day'),
+        api.get('/api/doctor/appointments?view=upcoming')
+      ]);
+      sToday.textContent = s.today;
+      sRemaining.textContent = s.remaining;
+      sDone.textContent = s.completed;
+      sWeek.textContent = s.next_week;
+      sRx.textContent = s.rx_active;
+
+      todayList.innerHTML = todays.length ? todays.map((a) => `
+        <li>
+          <span class="time">${esc(fmtTime(a.scheduled_start))}</span>
+          <div class="grow">
+            <a href="/doctor/patients.html?id=${a.patient_id}"><b>${esc(a.patient_name)}</b></a>
+            <div class="small muted">${esc(a.reason || 'No reason given')}${a.allergies_summary ? ` · <span style="color:var(--error)">Allergies: ${esc(a.allergies_summary)}</span>` : ''}</div>
+            <div style="margin-top:6px">${badge(a.status)}</div>
+          </div>
+          ${apptActions(a)}
+        </li>`).join('') : '<li class="empty" style="display:block">No appointments today.</li>';
+
+      const later = upcoming.filter((a) => toDate(a.scheduled_start).toDateString() !== new Date().toDateString()).slice(0, 6);
+      upcomingList.innerHTML = later.length ? later.map((a) => `
+        <li><div class="grow"><b>${esc(a.patient_name)}</b><div class="small muted">${esc(fmtDateTime(a.scheduled_start))}</div></div></li>`).join('')
+        : '<li class="muted">Nothing booked yet.</li>';
+    }
+
+    wireApptActions(todayList, load);
+    App.ready.then((u) => {
+      greeting.textContent = `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, Dr ${u.name.split(' ').slice(-1)[0]}`;
+      load().catch((e) => toast(e.message, 'error'));
+    });
+  </script>
+</body>
+</html>

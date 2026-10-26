@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointments | Patient portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="patient" data-page="appointments" data-title="Appointments">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Appointments</h1><p>Book a new visit or manage the ones you have.</p></div>
+      <button class="btn" id="bookBtn" type="button">+ Book appointment</button>
+    </div>
+
+    <!-- Booking form -->
+    <section class="card hidden" id="bookCard" style="margin-bottom:20px">
+      <div class="card-head"><h2>Book an appointment</h2><button type="button" class="icon-btn" id="closeBook" aria-label="Close">✕</button></div>
+      <div id="alert" class="alert" role="alert"></div>
+      <form id="bookForm" novalidate>
+        <div class="row-3">
+          <label>Department <select id="deptSelect"><option value="">Any department</option></select></label>
+          <label>Doctor <select id="docSelect" required><option value="">Choose a doctor</option></select></label>
+          <label>Date <input type="date" id="dateInput" required></label>
+        </div>
+        <label>Available times</label>
+        <div id="slots" class="slots" style="margin-bottom:16px"><span class="muted small">Choose a doctor and date to see times.</span></div>
+        <label>Reason for visit <span class="opt">(optional)</span><input id="reason" maxlength="255" placeholder="e.g. follow-up, flu symptoms"></label>
+        <button class="btn" type="submit" id="confirmBtn" disabled>Confirm booking</button>
+      </form>
+    </section>
+
+    <div class="toolbar">
+      <div class="tabs" id="viewTabs">
+        <button data-view="upcoming" class="active">Upcoming</button>
+        <button data-view="past">Past</button>
+      </div>
+    </div>
+    <section class="card flush"><div id="apptTable"></div></section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    let all = [];
+    let view = 'upcoming';
+    let chosenSlot = null;
+
+    // ---------- list ----------
+    const isUpcoming = (a) => new Date(a.scheduled_end) >= new Date() && ['scheduled', 'checked_in', 'in_progress'].includes(a.status);
+
+    async function load() {
+      all = await api.get('/api/patient/appointments');
+      const rows = view === 'upcoming' ? all.filter(isUpcoming).reverse() : all.filter((a) => !isUpcoming(a));
+      renderTable('apptTable', [
+        { label: 'When', primary: true, render: (a) => `<span class="name">${esc(fmtDateTime(a.scheduled_start))}</span>` },
+        { label: 'Doctor', render: (a) => `Dr ${esc(a.doctor_name)}` },
+        { label: 'Department', render: (a) => esc(a.department || '—') + (a.location ? `<span class="sub">${esc(a.location)}</span>` : '') },
+        { label: 'Reason', render: (a) => esc(a.reason || '—') },
+        { label: 'Status', render: (a) => badge(a.status) },
+        { label: '', render: (a) => a.status === 'scheduled' && new Date(a.scheduled_start) > new Date()
+            ? `<div class="actions"><button class="btn sm danger" data-cancel="${a.appointment_id}">Cancel</button></div>` : '' }
+      ], rows, { empty: view === 'upcoming' ? 'You have no upcoming appointments.' : 'No past appointments.' });
+    }
+
+    viewTabs.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      view = b.dataset.view;
+      viewTabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+      load();
+    }));
+
+    apptTable.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-cancel]');
+      if (!btn || !confirm('Cancel this appointment?')) return;
+      try {
+        await busy(btn, () => api.patch(`/api/patient/appointments/${btn.dataset.cancel}/cancel`));
+        toast('Appointment cancelled');
+        load();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    // ---------- booking ----------
+    function showBooking(show) {
+      bookCard.classList.toggle('hidden', !show);
+      bookBtn.classList.toggle('hidden', show);
+      if (show) bookCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    bookBtn.addEventListener('click', () => showBooking(true));
+    closeBook.addEventListener('click', () => showBooking(false));
+
+    async function loadDoctors() {
+      const docs = await api.get(`/api/patient/doctors?department_id=${deptSelect.value}`);
+      docSelect.innerHTML = '<option value="">Choose a doctor</option>';
+      docs.forEach((d) => docSelect.add(new Option(`Dr ${d.first_name} ${d.last_name}${d.specialization ? ` – ${d.specialization}` : ''}${d.department && !deptSelect.value ? ` (${d.department})` : ''}`, d.staff_id)));
+      loadSlots();
+    }
+
+    async function loadSlots() {
+      chosenSlot = null;
+      confirmBtn.disabled = true;
+      if (!docSelect.value || !dateInput.value) {
+        slots.innerHTML = '<span class="muted small">Choose a doctor and date to see times.</span>';
+        return;
+      }
+      slots.innerHTML = '<span class="muted small">Loading…</span>';
+      try {
+        const list = await api.get(`/api/patient/doctors/${docSelect.value}/slots?date=${dateInput.value}`);
+        slots.innerHTML = list.length
+          ? list.map((s) => `<button type="button" data-start="${esc(s.start)}">${esc(fmtTime(s.start))}</button>`).join('')
+          : '<span class="muted small">No free times on this day. Weekdays 08:00 – 16:30 only. Try another date.</span>';
+      } catch (err) { slots.innerHTML = `<span class="small" style="color:var(--error)">${esc(err.message)}</span>`; }
+    }
+
+    slots.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-start]');
+      if (!b) return;
+      slots.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+      chosenSlot = b.dataset.start;
+      confirmBtn.disabled = false;
+    });
+
+    deptSelect.addEventListener('change', loadDoctors);
+    docSelect.addEventListener('change', loadSlots);
+    dateInput.addEventListener('change', loadSlots);
+
+    bookForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!chosenSlot) return showAlert('Please choose a time.');
+      try {
+        await busy(confirmBtn, () => api.post('/api/patient/appointments', { staff_id: docSelect.value, start: chosenSlot, reason: reason.value }));
+        toast('Appointment booked');
+        hideAlert();
+        reason.value = '';
+        showBooking(false);
+        view = 'upcoming';
+        viewTabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x.dataset.view === 'upcoming'));
+        load();
+      } catch (err) {
+        showAlert(err.message);
+        loadSlots();
+      }
+    });
+
+    App.ready.then(async () => {
+      dateInput.min = todayISO();
+      dateInput.value = todayISO(1);
+      const depts = await api.get('/api/patient/departments');
+      depts.forEach((d) => deptSelect.add(new Option(d.name, d.department_id)));
+      await Promise.all([load(), loadDoctors()]);
+      if (new URLSearchParams(location.search).get('book')) showBooking(true);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patients | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="patients" data-title="Patients">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Patients</h1><p id="count">All registered patients.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <input class="search" type="search" id="search" placeholder="Search name, email or phone">
+    </div>
+
+    <section class="card flush"><div id="patientTable"></div></section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    async function load() {
+      const rows = await api.get(`/api/admin/patients?q=${encodeURIComponent(search.value)}`);
+      count.textContent = `${rows.length} patient${rows.length === 1 ? '' : 's'} shown.`;
+      renderTable('patientTable', [
+        { label: 'Name', primary: true, render: (p) => `<span class="name">${esc(p.first_name)} ${esc(p.last_name)}</span><span class="sub">${esc(p.email || '')}</span>` },
+        { label: 'Age', render: (p) => `${age(p.date_of_birth)} <span class="sub">${esc(fmtDate(p.date_of_birth))}</span>` },
+        { label: 'Gender', render: (p) => esc(label(p.gender)) },
+        { label: 'Phone', render: (p) => esc(p.phone || '—') },
+        { label: 'City', render: (p) => esc(p.city || '—') },
+        { label: 'Medical aid', render: (p) => esc(p.insurance_provider || '—') },
+        { label: 'Visits', render: (p) => p.appointments },
+        { label: 'Online', render: (p) => p.has_account ? badge('active', 'Yes') : badge('', 'No') }
+      ], rows, { empty: 'No patients found.' });
+    }
+
+    search.addEventListener('input', debounce(load));
+    App.ready.then(load);
+  </script>
+</body>
+</html>

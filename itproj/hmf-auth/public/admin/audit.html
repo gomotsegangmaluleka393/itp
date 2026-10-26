@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit log | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="audit" data-title="Audit log">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Audit log</h1><p>Who did what and when (latest 200).</p></div>
+    </div>
+
+    <div class="toolbar">
+      <select id="actionFilter" aria-label="Action">
+        <option value="">All actions</option>
+        <option>LOGIN</option><option>LOGIN_FAILED</option><option>LOGOUT</option>
+        <option>VIEW_RECORD</option><option>CREATE_PRESCRIPTION</option><option>UPDATE_PRESCRIPTION</option>
+        <option>UPDATE_APPOINTMENT</option><option>STAFF_REGISTERED</option><option>STAFF_ACTIVATED</option>
+        <option>STAFF_DEACTIVATED</option><option>STAFF_UPDATED</option><option>PASSWORD_CHANGED</option>
+        <option>DEPARTMENT_CREATED</option><option>DEPARTMENT_DELETED</option>
+      </select>
+    </div>
+
+    <section class="card flush"><div id="auditTable"></div></section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    const colour = (a) => a.includes('FAILED') || a.includes('DEACTIVATED') || a.includes('DELETED') ? 'red'
+      : a.startsWith('LOGIN') || a === 'LOGOUT' ? '' : 'teal';
+
+    async function load() {
+      const rows = await api.get(`/api/admin/audit?limit=200&action=${encodeURIComponent(actionFilter.value)}`);
+      renderTable('auditTable', [
+        { label: 'When', primary: true, render: (r) => `<span class="name">${esc(fmtDateTime(r.occurred_at))}</span>` },
+        { label: 'Action', render: (r) => `<span class="badge ${colour(r.action)}">${esc(label(r.action).toLowerCase())}</span>` },
+        { label: 'By', render: (r) => `${esc(r.staff_name || 'System')}${r.role ? `<span class="sub">${esc(r.role)}</span>` : ''}` },
+        { label: 'Record', render: (r) => `${esc(r.entity_type)} <span class="sub">${esc(String(r.entity_id).slice(0, 8))}</span>` }
+      ], rows, { empty: 'No activity recorded.' });
+    }
+
+    actionFilter.addEventListener('change', load);
+    App.ready.then(load);
+  </script>
+</body>
+</html>

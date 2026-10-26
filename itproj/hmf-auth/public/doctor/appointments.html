@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My schedule | Doctor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="doctor" data-page="appointments" data-title="My schedule">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>My schedule</h1><p>Update each appointment as the patient moves through the visit.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs" id="viewTabs">
+        <button data-view="day" class="active">By day</button>
+        <button data-view="upcoming">Upcoming</button>
+        <button data-view="past">Past</button>
+      </div>
+      <input type="date" id="dayPicker" aria-label="Day">
+    </div>
+
+    <section class="card flush"><div id="apptTable"></div></section>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/doctor.js"></script>
+  <script>
+    let view = new URLSearchParams(location.search).get('view') || 'day';
+    dayPicker.value = todayISO();
+
+    async function load() {
+      dayPicker.classList.toggle('hidden', view !== 'day');
+      const rows = await api.get(`/api/doctor/appointments?view=${view}&date=${dayPicker.value}`);
+      renderTable('apptTable', [
+        { label: 'Time', primary: true, render: (a) => `<span class="name">${esc(view === 'day' ? fmtTime(a.scheduled_start) : fmtDateTime(a.scheduled_start))}</span>` },
+        { label: 'Patient', render: (a) => `<a href="/doctor/patients.html?id=${a.patient_id}">${esc(a.patient_name)}</a><span class="sub">Age ${age(a.date_of_birth)}</span>` },
+        { label: 'Reason', render: (a) => esc(a.reason || '—') },
+        { label: 'Allergies', render: (a) => a.allergies_summary ? `<span style="color:var(--error)">${esc(a.allergies_summary)}</span>` : '—' },
+        { label: 'Status', render: (a) => badge(a.status) },
+        { label: '', render: apptActions }
+      ], rows, { empty: view === 'day' ? 'No appointments on this day.' : 'No appointments.' });
+    }
+
+    viewTabs.querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.view === view);
+      b.addEventListener('click', () => {
+        view = b.dataset.view;
+        viewTabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+        load();
+      });
+    });
+    dayPicker.addEventListener('change', load);
+    wireApptActions(apptTable, load);
+    App.ready.then(load);
+  </script>
+</body>
+</html>

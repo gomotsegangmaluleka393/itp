@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deliveries | Patient portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="patient" data-page="deliveries" data-title="Deliveries">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Deliveries</h1><p>Track medicine being delivered to you. This page updates by itself while a driver is on the way.</p></div>
+      <a class="btn secondary" href="/patient/prescriptions.html">Request a delivery</a>
+    </div>
+    <div id="delList" class="grid-auto"></div>
+  </main>
+
+  <dialog class="modal" id="proofModal">
+    <div class="modal-head"><h2>Your signature</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="modal-body"><img id="proofImg" alt="Signature given when the delivery was received" style="width:100%;border:1px solid var(--line);border-radius:8px;background:#fff"></div>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    // Order of a normal delivery, used for the progress bar
+    const STEPS = ['pending', 'assigned', 'out_for_delivery', 'delivered'];
+    const STEP_TEXT = ['Requested', 'Driver assigned', 'On the way', 'Delivered'];
+    const hhmm = (t) => (t ? t.slice(0, 5) : '');
+    let timer = null;
+
+    async function load() {
+      const rows = await api.get('/api/patient/deliveries');
+      if (!rows.length) {
+        delList.innerHTML = '<div class="card empty">No deliveries yet. Open My prescriptions and press "Request delivery".</div>';
+        return;
+      }
+      delList.innerHTML = rows.map((d) => {
+        const failed = ['failed', 'cancelled', 'returned'].includes(d.status);
+        const reached = failed ? Math.max(1, d.history.filter((h) => STEPS.includes(h.status)).length) : STEPS.indexOf(d.status) + 1;
+        const win = d.scheduled_window_start ? `${hhmm(d.scheduled_window_start)} – ${hhmm(d.scheduled_window_end)}` : '';
+        const map = d.driver_lat ? `https://www.google.com/maps/search/?api=1&query=${d.driver_lat},${d.driver_lng}` : '';
+        return `
+        <section class="card">
+          <div class="card-head"><h2>${d.scheduled_date ? esc(fmtDay(d.scheduled_date)) : 'Delivery'}</h2>${badge(d.status)}</div>
+          ${d.medicines ? `<div class="small muted">${esc(d.medicines)}</div>` : ''}
+          <div class="steps ${failed ? 'failed' : ''}">${STEPS.map((_, i) => `<span class="${i < reached ? 'done' : ''}"></span>`).join('')}</div>
+          <div class="step-labels">${STEP_TEXT.map((t) => `<span>${t}</span>`).join('')}</div>
+          ${d.confirmation_code ? `
+            <div class="code-box"><div><div class="small">Give this code to the driver</div><div class="code">${esc(d.confirmation_code)}</div></div></div>` : ''}
+          ${map ? `<p style="margin:12px 0 0"><a class="btn secondary sm" href="${map}" target="_blank" rel="noopener">See driver on map</a>
+             <span class="small muted">updated ${esc(fmtTime(d.driver_location_at))}</span></p>` : ''}
+          <dl class="details" style="margin-top:16px">
+            <dt>Address</dt><dd>${esc([d.address_line1, d.address_line2, d.city].filter(Boolean).join(', '))}</dd>
+            ${win ? `<dt>Time window</dt><dd>${esc(win)}</dd>` : ''}
+            ${d.driver_name ? `<dt>Driver</dt><dd>${esc(d.driver_name)}</dd>` : ''}
+            ${d.delivered_at ? `<dt>Delivered</dt><dd>${esc(fmtDateTime(d.delivered_at))}${d.recipient_name ? ` to ${esc(d.recipient_name)}` : ''}</dd>` : ''}
+            ${d.failure_reason ? `<dt>Note</dt><dd style="color:var(--error)">${esc(d.failure_reason)}</dd>` : ''}
+          </dl>
+          <div class="actions" style="margin-top:12px">
+            ${['pending', 'assigned'].includes(d.status) ? `<button class="btn sm danger" data-cancel="${d.delivery_id}">Cancel delivery</button>` : ''}
+            ${d.has_signature ? `<button class="btn sm secondary" data-proof="${d.delivery_id}">View signature</button>` : ''}
+          </div>
+          ${d.history.length ? `<details style="margin-top:12px"><summary class="small" style="cursor:pointer">History</summary>
+            <ul class="list">${d.history.map((h) => `<li><div class="grow">${badge(h.status)}${h.notes ? `<div class="small muted">${esc(h.notes)}</div>` : ''}</div><span class="small muted">${esc(fmtDateTime(h.at))}</span></li>`).join('')}</ul></details>` : ''}
+        </section>`;
+      }).join('');
+
+      // refresh every 30 seconds while something is on the road
+      clearTimeout(timer);
+      if (rows.some((d) => ['assigned', 'out_for_delivery'].includes(d.status))) timer = setTimeout(load, 30000);
+    }
+
+    delList.addEventListener('click', async (e) => {
+      const c = e.target.closest('[data-cancel]');
+      const p = e.target.closest('[data-proof]');
+      if (p) { proofImg.src = `/api/patient/deliveries/${p.dataset.proof}/proof`; openModal('proofModal'); }
+      if (c && confirm('Cancel this delivery?')) {
+        try {
+          await busy(c, () => api.patch(`/api/patient/deliveries/${c.dataset.cancel}/cancel`));
+          toast('Delivery cancelled');
+          load();
+        } catch (err) { toast(err.message, 'error'); }
+      }
+    });
+
+    App.ready.then(() => load().catch((e) => toast(e.message, 'error')));
+  </script>
+</body>
+</html>

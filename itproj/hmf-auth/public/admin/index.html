@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="admin" data-page="dashboard" data-title="Dashboard">
+  <main class="page">
+    <div class="page-head">
+      <div><h1 id="greeting">Dashboard</h1><p id="today"></p></div>
+    </div>
+
+    <!-- Key numbers -->
+    <div class="grid-stats">
+      <a class="stat" href="/admin/patients.html"><div class="label">Patients</div><div class="value" id="sPatients">–</div></a>
+      <a class="stat" href="/admin/staff.html"><div class="label">Active staff</div><div class="value" id="sStaff">–</div></a>
+      <a class="stat" id="pendingTile" href="/admin/staff.html?status=pending"><div class="label">Awaiting approval</div><div class="value" id="sPending">–</div></a>
+      <a class="stat" href="/admin/appointments.html"><div class="label">Appointments today</div><div class="value" id="sToday">–</div></a>
+      <div class="stat"><div class="label">Active prescriptions</div><div class="value" id="sRx">–</div><div class="note" id="sRxNote"></div></div>
+      <a class="stat" href="/admin/deliveries.html"><div class="label">Open deliveries</div><div class="value" id="sDel">–</div></a>
+    </div>
+
+    <div class="grid-main">
+      <div class="stack">
+        <section class="card">
+          <div class="card-head"><h2>Appointments, next 7 days</h2></div>
+          <div class="bars" id="weekChart"></div>
+        </section>
+
+        <section class="card flush">
+          <div class="card-head"><h2>Staff waiting for approval</h2><a href="/admin/staff.html?status=pending" class="small">View all</a></div>
+          <div id="pendingTable"></div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="card">
+          <div class="card-head"><h2>Today by status</h2></div>
+          <ul class="list" id="todayStatus"></ul>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Recent activity</h2><a href="/admin/audit.html" class="small">Audit log</a></div>
+          <ul class="list" id="activity"></ul>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    document.getElementById('today').textContent = new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    async function loadStats() {
+      const s = await api.get('/api/admin/stats');
+      sPatients.textContent = s.patients;
+      sStaff.textContent = s.staff_active;
+      sPending.textContent = s.staff_pending;
+      pendingTile.classList.toggle('attention', s.staff_pending > 0);
+      sToday.textContent = s.appts_today;
+      sRx.textContent = s.rx_active;
+      sRxNote.textContent = s.rx_expiring ? `${s.rx_expiring} expiring within 7 days` : '';
+      sDel.textContent = s.deliveries_open;
+
+      // simple bar chart
+      const max = Math.max(1, ...s.week.map((d) => d.count));
+      weekChart.innerHTML = s.week.map((d) => `
+        <div class="bar" title="${esc(fmtDay(d.day))}: ${d.count}">
+          <div class="num">${d.count}</div>
+          <div class="fill" style="height:${(d.count / max) * 100}%"></div>
+          <div class="day">${esc(toDate(d.day).toLocaleDateString(LOCALE, { weekday: 'short' }))}</div>
+        </div>`).join('');
+
+      todayStatus.innerHTML = s.today.length
+        ? s.today.map((t) => `<li><span class="grow">${badge(t.status)}</span><b>${t.count}</b></li>`).join('')
+        : '<li class="muted">No appointments today</li>';
+    }
+
+    async function loadPending() {
+      const rows = (await api.get('/api/admin/staff?status=pending')).slice(0, 5);
+      renderTable('pendingTable', [
+        { label: 'Name', primary: true, render: (s) => `<span class="name">${esc(s.first_name)} ${esc(s.last_name)}</span><span class="sub">${esc(s.email)}</span>` },
+        { label: 'Role', render: (s) => esc(label(s.role)) },
+        { label: 'License', render: (s) => esc(s.license_number || '—') },
+        { label: '', render: (s) => `<div class="actions"><button class="btn sm" data-approve="${s.staff_id}">Approve</button></div>` }
+      ], rows, { empty: 'No one is waiting for approval.' });
+    }
+
+    async function loadActivity() {
+      const rows = await api.get('/api/admin/audit?limit=8');
+      activity.innerHTML = rows.length ? rows.map((r) => `
+        <li><div class="grow"><b>${esc(label(r.action).toLowerCase())}</b>
+          <div class="small muted">${esc(r.staff_name || 'System')} · ${esc(fmtDateTime(r.occurred_at))}</div></div></li>`).join('')
+        : '<li class="muted">No activity yet</li>';
+    }
+
+    document.getElementById('pendingTable').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-approve]');
+      if (!btn) return;
+      try {
+        await busy(btn, () => api.patch(`/api/admin/staff/${btn.dataset.approve}`, { is_active: true }));
+        toast('Staff member approved');
+        loadAll();
+        App.refreshCounts();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    const loadAll = () => Promise.all([loadStats(), loadPending(), loadActivity()]).catch((e) => toast(e.message, 'error'));
+    App.ready.then((u) => {
+      greeting.textContent = `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${u.name.split(' ')[0]}`;
+      loadAll();
+    });
+  </script>
+</body>
+</html>

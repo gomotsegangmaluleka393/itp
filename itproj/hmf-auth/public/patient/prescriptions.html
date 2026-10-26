@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prescriptions | Patient portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="patient" data-page="prescriptions" data-title="Prescriptions">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Prescriptions</h1><p>A prescription can only be used until its expiry date. After that it is marked as expired and stays in your records, but your doctor must issue a new one.</p></div>
+    </div>
+    <div id="rxList" class="grid-auto"></div>
+  </main>
+
+  <!-- Request delivery -->
+  <dialog class="modal" id="deliveryModal">
+    <form id="deliveryForm" novalidate>
+      <div class="modal-head"><h2>Request delivery</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+      <div class="modal-body">
+        <div id="dAlert" class="alert" role="alert"></div>
+        <p class="small muted">Your prescription is checked first. You'll get a 4-digit code to give the driver, and you'll sign on their phone.</p>
+        <label>Street address <input name="address_line1" maxlength="150" required></label>
+        <label>Address line 2 <span class="opt">(optional)</span><input name="address_line2" maxlength="150"></label>
+        <div class="row">
+          <label>City <input name="city" maxlength="80" required></label>
+          <label>Postal code <input name="postal_code" maxlength="20"></label>
+        </div>
+        <div class="row">
+          <label>Phone at the address <input type="tel" name="contact_phone" maxlength="20"></label>
+          <label>Preferred date <span class="opt">(optional)</span><input type="date" name="scheduled_date"></label>
+        </div>
+        <label>Instructions for the driver <span class="opt">(optional)</span><input name="delivery_instructions" maxlength="500" placeholder="e.g. gate code, leave with security"></label>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Request delivery</button></div>
+    </form>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    let profile = null;
+    let chosen = null;
+
+    async function load() {
+      const [rows, deliveries] = await Promise.all([api.get('/api/patient/prescriptions'), api.get('/api/patient/deliveries')]);
+      const open = new Set(deliveries.filter((d) => ['pending', 'assigned', 'out_for_delivery'].includes(d.status)).map((d) => d.prescription_id));
+
+      if (!rows.length) {
+        rxList.innerHTML = '<div class="card empty">You have no prescriptions yet.</div>';
+        return;
+      }
+      rxList.innerHTML = rows.map((rx) => {
+        const soon = rx.status === 'active' && rx.days_left <= 7;
+        const action = rx.is_expired
+            ? (rx.renewed_by ? `<p class="small">Your doctor has issued a new prescription to replace this one.</p>`
+              : `<div class="alert warn" style="margin:0 0 10px">Expired on ${esc(fmtDate(rx.expiry_date))}. It can't be used or delivered any more – ask your doctor for a new prescription.</div>
+                 <a class="btn secondary block" href="/patient/appointments.html?book=1">Book a follow-up</a>`)
+          : rx.status !== 'active' ? ''
+          : open.has(rx.prescription_id) ? `<a class="btn secondary block" href="/patient/deliveries.html">Delivery on the way – track it</a>`
+          : rx.times_dispensed >= rx.times_allowed ? `<p class="small muted">All refills used. Book a follow-up for a new prescription.</p>`
+          : `<button class="btn block" data-deliver="${rx.prescription_id}">${rx.times_dispensed ? `Reorder (${rx.times_allowed - rx.times_dispensed} left)` : 'Request delivery'}</button>`;
+        return `
+        <section class="card">
+          <div class="card-head">
+            <div><h2>${esc(fmtDate(rx.issue_date))}</h2><div class="small muted">Dr ${esc(rx.doctor_name)}</div></div>
+            ${badge(rx.status)}
+          </div>
+          <div class="small ${soon ? '' : 'muted'}" style="${soon ? 'color:var(--warn);font-weight:600' : ''}">
+            ${rx.status === 'active' ? `Valid until ${esc(fmtDate(rx.expiry_date))}${soon ? ` (${rx.days_left} day${rx.days_left === 1 ? '' : 's'} left)` : ''}` : `Expiry date ${esc(fmtDate(rx.expiry_date))}`}
+          </div>
+          ${rx.items.map((i) => `
+            <div class="med">
+              <b>${esc(i.medication)}</b>
+              ${i.generic_name ? `<div class="small muted">${esc(i.generic_name)}</div>` : ''}
+              <div class="small" style="margin-top:4px">${esc(i.dosage)} · ${esc(i.frequency)}${i.route ? ` · ${esc(i.route)}` : ''}</div>
+              <div class="small muted">${[i.duration_days && `${i.duration_days} days`, i.quantity && `Qty ${i.quantity}`, `${i.refills_allowed} refill${i.refills_allowed === 1 ? '' : 's'}`].filter(Boolean).map(esc).join(' · ')}</div>
+              ${i.instructions ? `<div class="small" style="margin-top:4px">${esc(i.instructions)}</div>` : ''}
+            </div>`).join('')}
+          <p class="small muted" style="margin:12px 0">Prescription number (for the pharmacy):<br><span class="mono">${esc(rx.prescription_id)}</span></p>
+          ${action}
+        </section>`;
+      }).join('');
+    }
+
+    rxList.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-deliver]');
+      if (!b) return;
+      chosen = b.dataset.deliver;
+      deliveryForm.reset();
+      hideAlert('dAlert');
+      // start with the address on the profile
+      for (const f of ['address_line1', 'address_line2', 'city', 'postal_code']) deliveryForm[f].value = profile[f] || '';
+      deliveryForm.contact_phone.value = profile.phone || '';
+      deliveryForm.scheduled_date.min = todayISO();
+      openModal('deliveryModal');
+    });
+
+    deliveryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = formData(deliveryForm);
+      if (!d.address_line1 || !d.city) return showAlert('Enter the street address and city.', 'error', 'dAlert');
+      try {
+        const res = await busy(e.submitter, () => api.post('/api/patient/deliveries', { ...d, prescription_id: chosen }));
+        closeModal('deliveryModal');
+        toast(`Delivery requested. Your code is ${res.confirmation_code}`);
+        load();
+      } catch (err) { showAlert(err.message, 'error', 'dAlert'); }
+    });
+
+    App.ready.then(async () => {
+      profile = await api.get('/api/patient/profile');
+      load().catch((e) => toast(e.message, 'error'));
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HMF Driver</string>
+    <string name="login_subtitle">For hospital delivery drivers</string>
+    <string name="active">To deliver</string>
+    <string name="completed">Completed</string>
+    <string name="route_all">Open route in Google Maps</string>
+    <string name="no_active">No deliveries assigned to you right now. Pull down to refresh.</string>
+    <string name="no_completed">No completed deliveries in the last 30 days.</string>
+    <string name="navigate">Navigate</string>
+    <string name="call">Call</string>
+    <string name="start_delivery">I\'ve collected it – start delivery</string>
+    <string name="complete_delivery">Complete delivery</string>
+    <string name="could_not_deliver">Could not deliver</string>
+    <string name="fail_title">Why could it not be delivered?</string>
+    <string name="fail_hint">e.g. nobody home, wrong address</string>
+    <string name="save">Save</string>
+    <string name="id_check">Controlled medicine: check the patient\'s ID before handing over</string>
+    <string name="confirm_id">I have checked the patient\'s ID</string>
+    <string name="code">Patient\'s 4-digit code</string>
+    <string name="recipient">Name of person receiving it</string>
+    <string name="sign_here">Ask the person to sign below</string>
+    <string name="clear">Clear</string>
+    <string name="confirm_delivery">Confirm delivery</string>
+    <string name="need_location">Location is needed so the patient can see you are on the way.</string>
+    <string name="tracking_channel">Location sharing</string>
+    <string name="tracking_title">Delivering medicine</string>
+    <string name="tracking_text">Your location is shared with the patient until the delivery is done.</string>
+    <string name="history">History</string>
+    <string name="instructions">Instructions</string>
+    <string name="window">Time window</string>
+    <string name="items">Order</string>
+    <string name="vehicle">Vehicle</string>
+</resources>

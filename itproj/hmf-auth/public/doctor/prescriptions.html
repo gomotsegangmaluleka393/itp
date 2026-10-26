@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prescriptions | Doctor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="doctor" data-page="prescriptions" data-title="Prescriptions">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Prescriptions</h1><p>Prescriptions you have written. When one expires it is kept but can't be used again – issue a new one if the patient still needs it.</p></div>
+      <button class="btn" id="newBtn" type="button">+ New prescription</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs" id="statusTabs">
+        <button data-status="active" class="active">Active</button>
+        <button data-status="">All</button>
+        <button data-status="expired">Expired</button>
+        <button data-status="completed">Completed</button>
+        <button data-status="cancelled">Cancelled</button>
+      </div>
+    </div>
+
+    <section class="card flush"><div id="rxTable"></div></section>
+  </main>
+
+  <!-- New prescription -->
+  <dialog class="modal wide" id="rxModal">
+    <form id="rxForm" novalidate>
+      <div class="modal-head"><h2 id="rxTitle">New prescription</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+      <div class="modal-body">
+        <div id="rxAlert" class="alert" role="alert"></div>
+        <div class="row-3">
+          <label>Patient <select name="patient_id" id="patientSelect" required><option value="">Choose a patient</option></select></label>
+          <label>Appointment <span class="opt">(optional)</span><select name="appointment_id" id="apptSelect"><option value="">None</option></select></label>
+          <label>Expires on <input type="date" name="expiry_date" id="expiry" required></label>
+        </div>
+        <div id="allergyNote" class="alert error"></div>
+        <div id="vBox"></div>
+
+        <fieldset>
+          <legend>Medication</legend>
+          <div id="items"></div>
+          <button type="button" class="btn secondary sm" id="addItem" style="margin-top:12px">+ Add another medication</button>
+        </fieldset>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn secondary" data-close>Cancel</button>
+        <button type="button" class="btn secondary" id="checkBtn">Check</button>
+        <button class="btn" type="submit" id="issueBtn">Issue prescription</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="itemTpl">
+    <div class="med item">
+      <div class="card-head" style="margin-bottom:8px"><b>Medication</b><button type="button" class="btn sm danger remove">Remove</button></div>
+      <label>Medicine <select data-f="medication_id" required></select></label>
+      <div class="row-3">
+        <label>Dosage <input data-f="dosage" placeholder="e.g. 500mg" maxlength="80" required></label>
+        <label>Frequency <input data-f="frequency" placeholder="e.g. twice daily" maxlength="80" required></label>
+        <label>Route <select data-f="route"><option>oral</option><option>topical</option><option>inhaled</option><option>IV</option><option>IM</option><option>subcutaneous</option></select></label>
+      </div>
+      <div class="row-3">
+        <label>Days <input data-f="duration_days" type="number" min="0" inputmode="numeric"></label>
+        <label>Quantity <input data-f="quantity" type="number" min="0" inputmode="numeric"></label>
+        <label>Refills <input data-f="refills_allowed" type="number" min="0" value="0" inputmode="numeric"></label>
+      </div>
+      <label>Instructions <span class="opt">(optional)</span><input data-f="instructions" placeholder="e.g. take after meals"></label>
+    </div>
+  </template>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/validation.js"></script>
+  <script>
+    let tab = 'active';
+    let rows = [];
+    let meds = [];
+    let patients = [];
+
+    const expiryBadge = (rx) => rx.status === 'active' && rx.days_left <= 7 ? badge('expiring', `${rx.days_left} day${rx.days_left === 1 ? '' : 's'} left`) : '';
+
+    async function load() {
+      rows = await api.get(`/api/doctor/prescriptions?status=${tab}`);
+      renderTable('rxTable', [
+        { label: 'Patient', primary: true, render: (rx) => `<span class="name">${esc(rx.patient_name)}</span>` },
+        { label: 'Medication', render: (rx) => rx.items.map((i) => `${esc(i.medication)} <span class="sub">${esc(i.dosage)}, ${esc(i.frequency)}</span>`).join('') },
+        { label: 'Issued', render: (rx) => esc(fmtDate(rx.issue_date)) },
+        { label: 'Expires', render: (rx) => `${esc(fmtDate(rx.expiry_date))} ${expiryBadge(rx)}` },
+        { label: 'Status', render: (rx) => badge(rx.status) + (rx.renewed_from ? '<span class="sub">replaces an expired one</span>' : '') },
+        { label: '', render: (rx) => rx.status === 'active' ? `<div class="actions">
+            <button class="btn sm secondary" data-id="${rx.prescription_id}" data-s="completed">Complete</button>
+            <button class="btn sm danger" data-id="${rx.prescription_id}" data-s="cancelled">Cancel</button></div>`
+          : rx.is_expired ? (rx.renewed_by ? '<span class="badge green">New one issued</span>'
+            : `<div class="actions"><button class="btn sm" data-renew="${rx.prescription_id}">Issue new prescription</button></div>`) : '' }
+      ], rows, { empty: 'No prescriptions here.' });
+    }
+
+    statusTabs.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      tab = b.dataset.status;
+      statusTabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+      load();
+    }));
+
+    rxTable.addEventListener('click', async (e) => {
+      const renew = e.target.closest('[data-renew]');
+      if (renew) return openRenewal(rows.find((r) => r.prescription_id === renew.dataset.renew));
+      const btn = e.target.closest('[data-s]');
+      if (!btn) return;
+      if (btn.dataset.s === 'cancelled' && !confirm('Cancel this prescription? The patient will no longer be able to collect it.')) return;
+      try {
+        await busy(btn, () => api.patch(`/api/doctor/prescriptions/${btn.dataset.id}`, { status: btn.dataset.s }));
+        toast(`Prescription ${btn.dataset.s}`);
+        load();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    // ---------- new prescription form ----------
+
+    function addItem() {
+      const node = itemTpl.content.firstElementChild.cloneNode(true);
+      const sel = node.querySelector('[data-f="medication_id"]');
+      sel.add(new Option('Choose a medicine', ''));
+      meds.forEach((m) => sel.add(new Option(`${m.name}${m.generic_name ? ` (${m.generic_name})` : ''}${m.controlled_substance ? ' – controlled' : ''}`, m.medication_id)));
+      node.querySelector('.remove').addEventListener('click', () => {
+        if (items.children.length > 1) node.remove();
+      });
+      items.appendChild(node);
+    }
+
+    let renewedFrom = null; // the expired prescription a new one replaces
+
+    async function openForm(patientId) {
+      renewedFrom = null;
+      rxTitle.textContent = 'New prescription';
+      rxForm.reset();
+      hideAlert('rxAlert');
+      allergyNote.className = 'alert error';
+      items.innerHTML = '';
+      addItem();
+      expiry.min = todayISO(1);
+      expiry.value = todayISO(30);
+      apptSelect.innerHTML = '<option value="">None</option>';
+      resetValidation();
+      if (patientId) { patientSelect.value = patientId; await patientChanged(); }
+      openModal('rxModal');
+    }
+
+    // "Issue new prescription" for an expired one: same patient and medicines, new dates
+    async function openRenewal(old) {
+      await openForm(old.patient_id);
+      renewedFrom = old.prescription_id;
+      rxTitle.textContent = 'Issue new prescription';
+      items.innerHTML = '';
+      old.items.forEach((it) => {
+        addItem();
+        const node = items.lastElementChild;
+        for (const f of ['medication_id', 'dosage', 'frequency', 'route', 'duration_days', 'quantity', 'refills_allowed', 'instructions']) {
+          const el = node.querySelector(`[data-f="${f}"]`);
+          if (el && it[f] != null) el.value = it[f];
+        }
+      });
+      showAlert(`Replaces the prescription that expired on ${fmtDate(old.expiry_date)}. Check the medicines and doses, then issue.`, 'success', 'rxAlert');
+    }
+
+    // Load the patient's appointments and allergy note
+    async function patientChanged() {
+      apptSelect.innerHTML = '<option value="">None</option>';
+      allergyNote.className = 'alert error';
+      if (!patientSelect.value) return;
+      try {
+        const p = await api.get(`/api/doctor/patients/${patientSelect.value}`);
+        p.appointments.forEach((a) => apptSelect.add(new Option(`${fmtDateTime(a.scheduled_start)} – ${a.reason || label(a.status)}`, a.appointment_id)));
+        const recent = p.appointments.find((a) => ['in_progress', 'checked_in', 'completed'].includes(a.status));
+        if (recent) apptSelect.value = recent.appointment_id;
+        if (p.allergies_summary) {
+          allergyNote.textContent = `Allergies: ${p.allergies_summary}`;
+          allergyNote.className = 'alert error show';
+        }
+      } catch (err) { showAlert(err.message, 'error', 'rxAlert'); }
+    }
+
+    patientSelect.addEventListener('change', patientChanged);
+    document.getElementById('addItem').addEventListener('click', addItem);
+    newBtn.addEventListener('click', () => openForm());
+
+    // ---------- validation ----------
+    let acknowledged = false;
+
+    function resetValidation() {
+      acknowledged = false;
+      vBox.innerHTML = '';
+      issueBtn.textContent = 'Issue prescription';
+    }
+    // any change to the form means the doctor must look at the result again
+    rxForm.addEventListener('input', () => { if (acknowledged || vBox.innerHTML) { acknowledged = false; issueBtn.textContent = 'Issue prescription'; } });
+
+    function collect() {
+      const data = formData(rxForm);
+      if (renewedFrom) data.renewed_from = renewedFrom;
+      data.items = [...items.querySelectorAll('.item')].map((node) => {
+        const it = {};
+        node.querySelectorAll('[data-f]').forEach((el) => { it[el.dataset.f] = el.value.trim(); });
+        return it;
+      });
+      return data;
+    }
+
+    function missingFields() {
+      let bad = null;
+      rxForm.querySelectorAll('[required]').forEach((el) => {
+        const empty = !el.value.trim();
+        el.classList.toggle('invalid', empty);
+        if (empty && !bad) bad = el;
+      });
+      if (bad) { bad.focus(); showAlert('Please fill in the highlighted fields.', 'error', 'rxAlert'); }
+      return !!bad;
+    }
+
+    function showResult(v) {
+      vBox.innerHTML = renderValidation(v);
+      vBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    checkBtn.addEventListener('click', async () => {
+      hideAlert('rxAlert');
+      if (missingFields()) return;
+      try { showResult(await busy(checkBtn, () => api.post('/api/doctor/prescriptions/check', collect()))); }
+      catch (err) { showAlert(err.message, 'error', 'rxAlert'); }
+    });
+
+    rxForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideAlert('rxAlert');
+      if (missingFields()) return;
+      const data = collect();
+      if (acknowledged) data.acknowledge_warnings = true;
+
+      try {
+        await busy(issueBtn, () => api.post('/api/doctor/prescriptions', data));
+        closeModal('rxModal');
+        toast('Prescription issued');
+        tab = 'active';
+        statusTabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x.dataset.status === 'active'));
+        load();
+      } catch (err) {
+        if (err.data && err.data.validation) {
+          showResult(err.data.validation);
+          // warnings: the doctor can confirm and issue
+          if (err.data.needs_ack) { acknowledged = true; issueBtn.textContent = 'I have checked – issue anyway'; }
+        } else {
+          showAlert(err.message, 'error', 'rxAlert');
+        }
+      }
+    });
+
+    App.ready.then(async () => {
+      [meds, patients] = await Promise.all([api.get('/api/doctor/medications'), api.get('/api/doctor/patients')]);
+      patients.forEach((p) => patientSelect.add(new Option(`${p.first_name} ${p.last_name}`, p.patient_id)));
+      await load();
+      const qs = new URLSearchParams(location.search);
+      if (qs.get('new')) openForm(qs.get('patient'));
+    });
+  </script>
+</body>
+</html>

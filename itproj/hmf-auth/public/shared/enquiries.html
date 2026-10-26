@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient enquiries | Hospital Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<!-- Shared page: questions the health assistant passed to staff -->
+<body class="loading" data-portal="auto" data-page="enquiries" data-title="Patient enquiries">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>Patient enquiries</h1><p>Questions the health assistant handed over to staff. Emergencies are listed first.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <button data-s="open_all" class="active">Open</button>
+        <button data-s="resolved">Resolved</button>
+        <button data-s="">All</button>
+      </div>
+    </div>
+    <section class="card flush"><div id="table"></div></section>
+  </main>
+
+  <dialog class="modal" id="handleModal">
+    <form id="handleForm" novalidate>
+      <div class="modal-head"><h2 id="hTitle">Enquiry</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+      <div class="modal-body">
+        <div id="hBody"></div>
+        <label>Status
+          <select name="status"><option value="open">Open</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option></select>
+        </label>
+        <label>Notes (the patient can see these) <textarea name="staff_notes" maxlength="2000"></textarea></label>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Save</button></div>
+    </form>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    let tab = 'open_all';
+    let rows = [];
+    let current = null;
+    const urgencyColour = { emergency: 'red', urgent: 'amber', routine: 'blue' };
+
+    async function load() {
+      rows = await api.get(`/api/escalations?status=${tab}`);
+      renderTable('table', [
+        { label: 'Patient', primary: true, render: (e) => `<span class="name">${esc(e.patient_name)}</span><span class="sub">${esc(e.phone || 'No phone')}</span>` },
+        { label: 'Urgency', render: (e) => `<span class="badge ${urgencyColour[e.urgency]}">${esc(e.urgency)}</span>` },
+        { label: 'Topic', render: (e) => esc(label(e.category)) },
+        { label: 'Message', render: (e) => esc(e.patient_message.length > 90 ? e.patient_message.slice(0, 90) + '…' : e.patient_message) },
+        { label: 'Received', render: (e) => esc(fmtDateTime(e.created_at)) },
+        { label: 'Status', render: (e) => badge(e.status === 'resolved' ? 'completed' : e.status === 'open' ? 'pending' : 'in_progress', label(e.status)) + (e.handled_by_name ? `<span class="sub">${esc(e.handled_by_name)}</span>` : '') },
+        { label: '', render: (e) => `<div class="actions"><button class="btn sm secondary" data-id="${e.escalation_id}">Open</button></div>` }
+      ], rows, { empty: tab === 'open_all' ? 'No open enquiries.' : 'Nothing here.', onRowClick: openOne });
+    }
+
+    function openOne(e) {
+      current = e;
+      hTitle.textContent = e.patient_name;
+      hBody.innerHTML = `
+        <dl class="details" style="margin-bottom:16px">
+          <dt>Phone</dt><dd>${e.phone ? `<a href="tel:${esc(e.phone)}">${esc(e.phone)}</a>` : '—'}</dd>
+          <dt>Date of birth</dt><dd>${esc(fmtDate(e.date_of_birth))}</dd>
+          <dt>Urgency</dt><dd><span class="badge ${urgencyColour[e.urgency]}">${esc(e.urgency)}</span></dd>
+          <dt>Received</dt><dd>${esc(fmtDateTime(e.created_at))}</dd>
+        </dl>
+        <div class="med"><b>Patient wrote</b><div style="white-space:pre-wrap">${esc(e.patient_message)}</div></div>
+        <div style="height:16px"></div>`;
+      handleForm.status.value = e.status;
+      handleForm.staff_notes.value = e.staff_notes || '';
+      openModal('handleModal');
+    }
+
+    table.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-id]');
+      if (b) openOne(rows.find((r) => r.escalation_id === b.dataset.id));
+    });
+
+    handleForm.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      try {
+        await busy(ev.submitter, () => api.patch(`/api/escalations/${current.escalation_id}`, formData(handleForm)));
+        closeModal('handleModal');
+        toast('Saved');
+        load();
+        App.refreshCounts();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    tabs.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      tab = b.dataset.s;
+      tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+      load();
+    }));
+
+    App.ready.then(load);
+  </script>
+</body>
+</html>

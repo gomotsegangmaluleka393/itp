@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HMF Patient</string>
+    <string name="login_subtitle">Your medicine deliveries and health assistant</string>
+    <string name="my_deliveries">My deliveries</string>
+    <string name="prescriptions">My prescriptions</string>
+    <string name="assistant">Health assistant</string>
+    <string name="request_delivery">Request delivery</string>
+    <string name="no_deliveries">No deliveries yet. Tap "Request delivery" to get your medicine delivered.</string>
+    <string name="no_prescriptions">You have no prescriptions.</string>
+    <string name="give_code">Give this code to the driver</string>
+    <string name="see_driver">See driver on map</string>
+    <string name="view_signature">View signature</string>
+    <string name="cancel_delivery">Cancel delivery</string>
+    <string name="address">Street address</string>
+    <string name="address2">Address line 2 (optional)</string>
+    <string name="city">City</string>
+    <string name="postal_code">Postal code</string>
+    <string name="phone">Phone at the address</string>
+    <string name="date">Preferred date (optional)</string>
+    <string name="instructions">Instructions for the driver (optional)</string>
+    <string name="send_request">Send request</string>
+    <string name="request_note">Your prescription is checked first. You\'ll get a 4-digit code to give the driver, and you\'ll sign on their phone.</string>
+    <string name="type_message">Type your question…</string>
+    <string name="send">Send</string>
+    <string name="emergency_note">Emergency? Call 10177 or 112. Don\'t wait for a reply here.</string>
+</resources>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My patients | Doctor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="loading" data-portal="doctor" data-page="patients" data-title="My patients">
+  <main class="page">
+    <div class="page-head">
+      <div><h1>My patients</h1><p>Patients who have booked with you. Select a patient to see their record.</p></div>
+    </div>
+
+    <div class="toolbar">
+      <input class="search" type="search" id="search" placeholder="Search by name or email">
+    </div>
+
+    <section class="card flush"><div id="patientTable"></div></section>
+  </main>
+
+  <!-- Patient record -->
+  <dialog class="modal wide" id="patientModal">
+    <div class="modal-head"><h2 id="pName">Patient</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="modal-body" id="pBody"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn secondary" data-close>Close</button>
+      <a class="btn" id="pRxBtn" href="#">+ New prescription</a>
+    </div>
+  </dialog>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/layout.js"></script>
+  <script>
+    async function load() {
+      const rows = await api.get(`/api/doctor/patients?q=${encodeURIComponent(search.value)}`);
+      renderTable('patientTable', [
+        { label: 'Name', primary: true, render: (p) => `<span class="name">${esc(p.first_name)} ${esc(p.last_name)}</span><span class="sub">${esc(p.email || '')}</span>` },
+        { label: 'Age', render: (p) => `${age(p.date_of_birth)}` },
+        { label: 'Gender', render: (p) => esc(label(p.gender)) },
+        { label: 'Phone', render: (p) => esc(p.phone || '—') },
+        { label: 'Last visit', render: (p) => esc(p.last_visit ? fmtDate(p.last_visit) : '—') },
+        { label: 'Next visit', render: (p) => esc(p.next_visit ? fmtDateTime(p.next_visit) : '—') },
+        { label: 'Visits', render: (p) => p.visits }
+      ], rows, { empty: 'No patients yet. Patients appear here once they book with you.', onRowClick: (p) => openPatient(p.patient_id) });
+    }
+
+    async function openPatient(id) {
+      try {
+        const p = await api.get(`/api/doctor/patients/${id}`);
+        pName.textContent = `${p.first_name} ${p.last_name}`;
+        pRxBtn.href = `/doctor/prescriptions.html?new=1&patient=${p.patient_id}`;
+        const addr = [p.address_line1, p.address_line2, p.city, p.postal_code].filter(Boolean).join(', ');
+        pBody.innerHTML = `
+          ${p.allergies_summary ? `<div class="alert error show"><b>Allergies:</b> ${esc(p.allergies_summary)}</div>` : ''}
+          <div class="grid-2">
+            <dl class="details">
+              <dt>Date of birth</dt><dd>${esc(fmtDate(p.date_of_birth))} (age ${age(p.date_of_birth)})</dd>
+              <dt>Gender</dt><dd>${esc(label(p.gender))}</dd>
+              <dt>Phone</dt><dd>${esc(p.phone || '—')}</dd>
+              <dt>Email</dt><dd>${esc(p.email || '—')}</dd>
+              <dt>Address</dt><dd>${esc(addr || '—')}</dd>
+            </dl>
+            <dl class="details">
+              <dt>Emergency contact</dt><dd>${esc(p.emergency_contact_name || '—')}${p.emergency_contact_phone ? `<br>${esc(p.emergency_contact_phone)}` : ''}</dd>
+              <dt>Medical aid</dt><dd>${esc(p.insurance_provider || '—')}${p.insurance_policy_no ? `<br>${esc(p.insurance_policy_no)}` : ''}</dd>
+            </dl>
+          </div>
+
+          <h3 style="margin:24px 0 8px">Appointments with you</h3>
+          <ul class="list">${p.appointments.map((a) => `
+            <li><div class="grow"><b>${esc(fmtDateTime(a.scheduled_start))}</b><div class="small muted">${esc(a.reason || 'No reason given')}</div></div>${badge(a.status)}</li>`).join('') || '<li class="muted">None</li>'}</ul>
+
+          <h3 style="margin:24px 0 8px">Prescriptions</h3>
+          ${p.prescriptions.map((rx) => `
+            <div class="med">
+              <div class="card-head" style="margin-bottom:6px"><b>${esc(fmtDate(rx.issue_date))} · Dr ${esc(rx.doctor_name)}</b>${badge(rx.status)}</div>
+              <div class="small muted">Expires ${esc(fmtDate(rx.expiry_date))}</div>
+              ${rx.items.map((i) => `<div class="small" style="margin-top:6px">• <b style="display:inline">${esc(i.medication)}</b> ${esc(i.dosage)}, ${esc(i.frequency)}${i.route ? `, ${esc(i.route)}` : ''}</div>`).join('')}
+            </div>`).join('') || '<p class="muted">No prescriptions.</p>'}`;
+        openModal('patientModal');
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    search.addEventListener('input', debounce(load));
+    App.ready.then(() => {
+      load();
+      const id = new URLSearchParams(location.search).get('id');
+      if (id) openPatient(id);
+    });
+  </script>
+</body>
+</html>

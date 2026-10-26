@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4-part delivery progress bar, coloured by Steps.bind() -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/stepsBar"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="4dp" android:background="@color/core_line" />
+        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="4dp" android:background="@color/core_line" />
+        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="4dp" android:background="@color/core_line" />
+        <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/core_line" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+        <TextView style="@style/Hmf.Muted" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Requested" android:textSize="11sp" />
+        <TextView style="@style/Hmf.Muted" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Assigned" android:textSize="11sp" />
+        <TextView style="@style/Hmf.Muted" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="On the way" android:textSize="11sp" />
+        <TextView style="@style/Hmf.Muted" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="end" android:text="Delivered" android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>
