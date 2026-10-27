@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt         # closest Render region to South Africa
-    rootDir: itproj/hmf-auth  # path from the top of the GitHub repo
+    rootDir: hmf-auth
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
