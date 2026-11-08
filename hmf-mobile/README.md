@@ -13,16 +13,12 @@ Both apps use the same server as the web portal (`hmf-auth`).
 ## Open and run
 
 1. Open the `hmf-mobile` folder in Android Studio (Koala or newer) and let Gradle sync.
-2. Make sure the server is running on Render (or run `npm start` in `hmf-auth` to test locally).
+2. Start the server on your computer: run `npm start` in `hmf-auth` (it runs on port 3000).
 3. Choose `driver` or `patient` in the run menu and press Run.
 
-The apps connect to the live server on Render, `https://hmf.onrender.com`.
-If your Render address is different, change it in `core/src/main/res/values/config.xml`.
-The first request after the server has been idle can take about a minute while it wakes up.
-
-To test against your own computer instead, tap **Server settings** on the login screen and enter
-`http://10.0.2.2:3000` (Android emulator) or your computer's address, e.g. `http://192.168.1.20:3000`
-(real phone on the same Wi-Fi).
+The apps connect to the server on your own computer, `http://10.0.2.2:3000` (Android emulator).
+To use a real phone on the same Wi-Fi, change the address in `core/src/main/res/values/config.xml`
+to your computer's address, e.g. `http://192.168.1.20:3000`, and rebuild.
 
 Plain `http://` only works in debug builds. Release builds need an `https://` server.
 

@@ -3,7 +3,7 @@ package za.hmf.core;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** Keeps the login token and server address on the phone. */
+/** Keeps the login token on the phone. */
 public final class Session {
 
     private static final String PREFS = "hmf_session";
@@ -36,21 +36,16 @@ public final class Session {
         return space > 0 ? n.substring(0, space) : n;
     }
 
-    /** Clears the login but keeps the server address. */
+    /** Clears the login. */
     public static void clear(Context ctx) {
         prefs(ctx).edit().remove("token").remove("name").remove("email").apply();
     }
 
     // ---------- server address ----------
-    // Default comes from res/values/config.xml. 10.0.2.2 is your computer when using the emulator.
+    // Always comes from res/values/config.xml
 
     public static String baseUrl(Context ctx) {
-        String saved = prefs(ctx).getString("base_url", null);
-        String url = saved != null ? saved : ctx.getString(R.string.core_default_server);
+        String url = ctx.getString(R.string.core_default_server);
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-    }
-
-    public static void setBaseUrl(Context ctx, String url) {
-        prefs(ctx).edit().putString("base_url", url.trim()).apply();
     }
 }

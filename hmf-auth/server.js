@@ -5,6 +5,7 @@ const express = require('express');
 const session = require('express-session');
 const { userFromToken, revokeToken } = require('./lib/accounts');
 const { expirePrescriptions } = require('./lib/rxValidation');
+const { setupDb } = require('./lib/setupDb');
 
 const app = express();
 
@@ -90,8 +91,13 @@ async function expiryJob() {
     console.error('Prescription expiry check failed:', e.message);
   }
 }
-expiryJob();
-setInterval(expiryJob, 60 * 60 * 1000);
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`HMF running on port ${PORT}`));
+
+// Make sure the tables exist before taking requests
+setupDb()
+  .catch((e) => console.error('Database setup failed:', e.message))
+  .finally(() => {
+    app.listen(PORT, () => console.log(`HMF running on http://localhost:${PORT}`));
+    expiryJob();
+    setInterval(expiryJob, 60 * 60 * 1000);
+  });

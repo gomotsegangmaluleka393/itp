@@ -27,7 +27,7 @@ public abstract class BaseLoginActivity extends BaseActivity {
     /** Shown under the title, e.g. "For hospital delivery drivers". */
     protected abstract String subtitle();
 
-    private EditText email, password, server;
+    private EditText email, password;
     private Button loginBtn;
     private ProgressBar progress;
     private TextView error;
@@ -48,14 +48,9 @@ public abstract class BaseLoginActivity extends BaseActivity {
         ((TextView) findViewById(R.id.loginSubtitle)).setText(subtitle());
         email = findViewById(R.id.loginEmail);
         password = findViewById(R.id.loginPassword);
-        server = findViewById(R.id.loginServer);
         loginBtn = findViewById(R.id.loginButton);
         progress = findViewById(R.id.loginProgress);
         error = findViewById(R.id.loginError);
-
-        server.setText(Session.baseUrl(this));
-        findViewById(R.id.loginServerToggle).setOnClickListener(v ->
-                findViewById(R.id.loginServerBox).setVisibility(View.VISIBLE));
 
         loginBtn.setOnClickListener(v -> login());
     }
@@ -67,9 +62,6 @@ public abstract class BaseLoginActivity extends BaseActivity {
             showError(getString(R.string.core_enter_email_password));
             return;
         }
-        String url = server.getText().toString().trim();
-        if (!url.isEmpty()) Session.setBaseUrl(this, url);
-
         JSONObject body = new JSONObject();
         try {
             body.put("email", e).put("password", p).put("app", appType());

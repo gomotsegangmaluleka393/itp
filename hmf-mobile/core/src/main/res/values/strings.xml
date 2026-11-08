@@ -8,8 +8,6 @@
     <string name="core_logout_question">Do you want to log out?</string>
     <string name="core_logged_out">Your login has expired. Please log in again.</string>
     <string name="core_enter_email_password">Enter your email and password.</string>
-    <string name="core_server_settings">Server settings</string>
-    <string name="core_server_address">Server address</string>
     <string name="core_yes">Yes</string>
     <string name="core_cancel">Cancel</string>
     <string name="core_retry">Try again</string>
